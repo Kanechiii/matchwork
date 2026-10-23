@@ -1,122 +1,339 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+import { useEffect, useState } from "react";
+import type { MatchEvent } from "./types/match";
+import { demoMatch } from "./data/demoMatch";
+import { generateSyntheticMatch } from "./engine/generateEvents";
+import {
+  advanceReplay,
+  createReplayState,
+  getReplayFrame,
+  pauseReplay,
+  playReplay,
+  restartReplay,
+  seekReplay,
+  setReplaySpeed,
+} from "./engine/replay";
+import "./App.css";
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+// Generated once, outside React rendering.
+const match = generateSyntheticMatch(demoMatch);
 
-      <div className="ticks"></div>
+function formatClock(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+  return `${String(minutes).padStart(2, "0")}:${String(
+    remaining,
+  ).padStart(2, "0")}`;
 }
 
-export default App
+function describeEvent(event: MatchEvent): string {
+  switch (event.type) {
+    case "pass":
+      return event.completed
+        ? "Completed pass"
+        : "Incomplete pass";
+
+    case "shot":
+      return `Shot — ${event.outcome.replaceAll("_", " ")}`;
+
+    case "tackle":
+      return event.wonBall
+        ? "Successful tackle"
+        : "Unsuccessful tackle";
+
+    case "pressure":
+      return `Defensive pressure — level ${event.intensity}`;
+
+    case "possession_change":
+      return `Possession change — ${event.reason.replaceAll(
+        "_",
+        " ",
+      )}`;
+  }
+}
+
+interface StatRowProps {
+  label: string;
+  home: string | number;
+  away: string | number;
+}
+
+function StatRow({ label, home, away }: StatRowProps) {
+  return (
+    <div className="mw-stat-row">
+      <strong>{home}</strong>
+      <span>{label}</span>
+      <strong>{away}</strong>
+    </div>
+  );
+}
+
+function App() {
+  const [replay, setReplay] = useState(() =>
+    createReplayState(match),
+  );
+
+  // Advance simulated time using measured real elapsed time.
+  useEffect(() => {
+    if (replay.status !== "playing") {
+      return;
+    }
+
+    let previousTime = performance.now();
+
+    const timer = window.setInterval(() => {
+      const currentTime = performance.now();
+      const delta = currentTime - previousTime;
+      previousTime = currentTime;
+
+      setReplay((current) =>
+        advanceReplay(current, match, delta),
+      );
+    }, 100);
+
+    return () => window.clearInterval(timer);
+  }, [replay.status]);
+
+  const frame = getReplayFrame(match, replay);
+  const { home, away } = frame.stats;
+
+  const isPlaying = replay.status === "playing";
+
+  return (
+    <main className="mw-app">
+      <div className="mw-container">
+        <header className="mw-header">
+          <div>
+            <div className="mw-eyebrow">
+              SYNTHETIC FOOTBALL INTELLIGENCE
+            </div>
+            <h1>Matchwork<span className="mw-dot">.</span></h1>
+            <p>The game, understood.</p>
+          </div>
+
+          <span className="mw-demo-tag">DEMO MATCH</span>
+        </header>
+
+        <section className="mw-panel" aria-label="Match scoreboard">
+          <div className="mw-match-meta">
+            <span>FICTIONAL MATCH • 90 MINUTES</span>
+            <span className="mw-status">
+              {replay.status === "finished"
+                ? "FULL TIME"
+                : isPlaying
+                  ? "REPLAYING"
+                  : "PAUSED"}
+            </span>
+          </div>
+
+          <div className="mw-scoreboard">
+            <div className="mw-team">
+              <span
+                className="mw-team-color"
+                style={{
+                  backgroundColor: match.metadata.homeTeam.color,
+                }}
+              />
+              <strong>{match.metadata.homeTeam.name}</strong>
+              <small>{match.metadata.homeTeam.abbreviation}</small>
+            </div>
+
+            <div className="mw-score" aria-live="polite">
+              {home.goals} <span>:</span> {away.goals}
+            </div>
+
+            <div className="mw-team">
+              <span
+                className="mw-team-color"
+                style={{
+                  backgroundColor: match.metadata.awayTeam.color,
+                }}
+              />
+              <strong>{match.metadata.awayTeam.name}</strong>
+              <small>{match.metadata.awayTeam.abbreviation}</small>
+            </div>
+          </div>
+
+          <div className="mw-clock">
+            {formatClock(replay.elapsedSeconds)}
+            <span> / 90:00</span>
+          </div>
+
+          <label className="mw-slider-label" htmlFor="match-progress">
+            Match timeline
+          </label>
+          <input
+            id="match-progress"
+            className="mw-slider"
+            type="range"
+            min={0}
+            max={match.metadata.durationSeconds}
+            step={1}
+            value={replay.elapsedSeconds}
+            onChange={(event) =>
+              setReplay((current) =>
+                seekReplay(
+                  current,
+                  match,
+                  Number(event.target.value),
+                ),
+              )
+            }
+          />
+
+          <div className="mw-timeline-labels">
+            <span>00:00</span>
+            <span>45:00</span>
+            <span>90:00</span>
+          </div>
+
+          <div className="mw-controls">
+            <button
+              type="button"
+              onClick={() =>
+                setReplay((current) =>
+                  isPlaying
+                    ? pauseReplay(current)
+                    : playReplay(current, match),
+                )
+              }
+              disabled={replay.status === "finished"}
+              className="mw-primary"
+            >
+              {isPlaying ? "Pause" : "Play"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setReplay((current) => restartReplay(current))
+              }
+            >
+              Restart
+            </button>
+
+            <label className="mw-speed-label" htmlFor="replay-speed">
+              Speed
+              <select
+                id="replay-speed"
+                value={replay.speed}
+                onChange={(event) =>
+                  setReplay((current) =>
+                    setReplaySpeed(
+                      current,
+                      Number(event.target.value),
+                    ),
+                  )
+                }
+              >
+                <option value={1}>1×</option>
+                <option value={4}>4×</option>
+                <option value={16}>16×</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <div className="mw-grid">
+          <section className="mw-panel" aria-label="Match statistics">
+            <div className="mw-section-title">
+              <h2>Live Match Statistics</h2>
+              <span>AS OF {formatClock(replay.elapsedSeconds)}</span>
+            </div>
+
+            <div className="mw-stat-head">
+              <span>{match.metadata.homeTeam.abbreviation}</span>
+              <span>STATISTIC</span>
+              <span>{match.metadata.awayTeam.abbreviation}</span>
+            </div>
+
+            <StatRow
+              label="Possession"
+              home={`${home.possessionPct}%`}
+              away={`${away.possessionPct}%`}
+            />
+            <StatRow
+              label="Total shots"
+              home={home.shots}
+              away={away.shots}
+            />
+            <StatRow
+              label="Shots on target"
+              home={home.shotsOnTarget}
+              away={away.shotsOnTarget}
+            />
+            <StatRow
+              label="Passes attempted"
+              home={home.passesAttempted}
+              away={away.passesAttempted}
+            />
+            <StatRow
+              label="Completed passes"
+              home={home.passesCompleted}
+              away={away.passesCompleted}
+            />
+            <StatRow
+              label="Pass accuracy"
+              home={`${home.passCompletionPct}%`}
+              away={`${away.passCompletionPct}%`}
+            />
+            <StatRow
+              label="Tackles won"
+              home={home.tacklesWon}
+              away={away.tacklesWon}
+            />
+            <StatRow
+              label="Defensive pressures"
+              home={home.pressuresApplied}
+              away={away.pressuresApplied}
+            />
+          </section>
+
+          <section className="mw-panel" aria-label="Event feed">
+            <div className="mw-section-title">
+              <h2>Match Event Feed</h2>
+              <span>{frame.stats.processedEvents} / 1200</span>
+            </div>
+
+            <div className="mw-feed">
+              {frame.recentEvents.length === 0 ? (
+                <p className="mw-empty">No events yet.</p>
+              ) : (
+                frame.recentEvents
+                  .slice()
+                  .reverse()
+                  .map((event) => (
+                    <div className="mw-event" key={event.id}>
+                      <span className="mw-event-time">
+                        {formatClock(event.elapsedSeconds)}
+                      </span>
+
+                      <div>
+                        <strong>{describeEvent(event)}</strong>
+                        <small>
+                          {event.teamId ===
+                          match.metadata.homeTeam.id
+                            ? match.metadata.homeTeam.abbreviation
+                            : match.metadata.awayTeam.abbreviation}
+                          {" • "}
+                          {event.playerId}
+                        </small>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </section>
+        </div>
+
+        <footer className="mw-footer">
+          Matchwork • Synthetic demonstration data •
+          No real match footage or live Premier League data
+        </footer>
+      </div>
+    </main>
+  );
+}
+
+export default App;
