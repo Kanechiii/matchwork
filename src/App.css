@@ -328,3 +328,26 @@ body {
     flex-wrap: wrap;
   }
 }
+
+
+/* Phase 3: explainable intelligence presentation */
+.mw-intelligence { border-color: #286557; background: linear-gradient(145deg, #122c39, #101e30 72%); }
+.mw-insight-controls { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 20px; }
+.mw-insight-controls label { display: flex; gap: 8px; align-items: center; color: #c1d0df; font-size: 13px; }
+.mw-insight-controls select { min-width: 170px; background: #192c42; border: 1px solid #35506a; border-radius: 8px; color: #fff; padding: 9px; font: inherit; }
+.mw-model-status { font-size: 12px; color: #5bdbad; font-weight: 700; }
+.mw-insight-headline { font-size: clamp(24px, 4vw, 32px); margin: 10px 0; color: #fff; }
+.mw-insight-narrative { font-size: 16px; max-width: 760px; color: #e4edf8; }
+.mw-why { font-size: 14px; color: #bad0e0; }
+.mw-evidence { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+.mw-evidence span { font-size: 12px; background: #193b49; color: #b9f0d5; padding: 7px 12px; border-radius: 999px; }
+.mw-analyst-detail { padding: 12px; background: #0a1a2c; border: 1px solid #234858; border-radius: 10px; overflow-wrap: anywhere; }
+.mw-analyst-detail p { font-size: 12px; color: #acc3d7; }
+.mw-recap { margin: 18px 0 12px; padding: 16px; background: #0a1a2c; border-radius: 10px; }
+.mw-recap p { color: #c4d4e7; margin-bottom: 0; }
+.mw-disclaimer, .mw-error { font-size: 11px; color: #aebfd2; }
+.mw-error { color: #f0b0a6; display: block; }
+@media (max-width: 720px) {
+  .mw-insight-controls, .mw-insight-controls label { flex-direction: column; align-items: stretch; }
+  .mw-insight-controls select { width: 100%; }
+}
