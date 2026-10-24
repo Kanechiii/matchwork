@@ -79,3 +79,6 @@ jobs:
 
       - name: Enterprise integrity, deterministic resilience, and release audit
         run: node scripts/verifyEnterprise.mjs
+
+      - name: Verify specialist workflow prototype and evidence recovery
+        run: node scripts/verifyWorkflow.mjs
