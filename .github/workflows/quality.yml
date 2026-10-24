@@ -53,3 +53,6 @@ jobs:
 
       - name: Verify integration
         run: node scripts/verifyIntegration.mjs
+
+      - name: Verify Phase 3 intelligence
+        run: node scripts/verifyIntelligence.mjs
