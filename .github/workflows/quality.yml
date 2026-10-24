@@ -76,3 +76,6 @@ jobs:
 
       - name: Validate Pages asset paths
         run: node scripts/verifyPagesBuild.mjs
+
+      - name: Enterprise integrity, deterministic resilience, and release audit
+        run: node scripts/verifyEnterprise.mjs
