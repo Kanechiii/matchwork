@@ -68,3 +68,11 @@ jobs:
         run: |
           python3 scripts/train_match_state.py
           git diff --exit-code -- src/ai/model.ts
+
+      - name: Build GitHub Pages preview assets without deploying
+        run: npm run build
+        env:
+          MATCHWORK_PAGES: 'true'
+
+      - name: Validate Pages asset paths
+        run: node scripts/verifyPagesBuild.mjs
