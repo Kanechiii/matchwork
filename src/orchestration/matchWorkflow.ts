@@ -1,6 +1,6 @@
-import { calculateMatchStats } from "../engine/calculateStats";
-import { extractWindowFeatures } from "../ai/features";
-import type { SyntheticMatch } from "../types/match";
+import { calculateMatchStats } from "../engine/calculateStats.ts";
+import { extractWindowFeatures } from "../ai/features.ts";
+import type { SyntheticMatch } from "../types/match.ts";
 
 /**
  * Experimental multi-specialist *workflow*, NOT yet an LLM multi-agent system.
