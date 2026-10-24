@@ -1,0 +1,4 @@
+/** Embedded 340-byte ONNX model (opset 13) with synthetic weak-supervision labels.
+ * This classifier is illustrative and is not validated on real football data.
+ */
+export const EMBEDDED_ONNX_MODEL_BASE64 = "CAkSJ01hdGNod29yayBzeW50aGV0aWMgd2VhayBzdXBlcnZpc2lvbiB2MTqiAgoZCghmZWF0dXJlcwoBVxICbW0iBk1hdE11bAoUCgJtbQoBQhIGbG9naXRzIgNBZGQKIAoGbG9naXRzEg1wcm9iYWJpbGl0aWVzIgdTb2Z0bWF4EhhNYXRjaHdvcmtTdGF0ZUNsYXNzaWZpZXIqXwgHCAMQAUIBV0pUgMEkQLWZCMBaPuG+NeKWwJmAAUH7PVjASoOOwKyricB7FwxBFzsCwCArAEDQ/QM9FQwjwM4IJD6IyxhAUZDoPy4t+L1+Ddm/piA0wDrzhz8STuA/KhUIAxABQgFCSgyxwplArXPXv4vLR8BaGgoIZmVhdHVyZXMSDgoMCAESCAoCCAEKAggHYh8KDXByb2JhYmlsaXRpZXMSDgoMCAESCAoCCAEKAggDQgIQDQ==";

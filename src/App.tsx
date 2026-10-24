@@ -13,6 +13,10 @@ import {
   seekReplay,
   setReplaySpeed,
 } from "./engine/replay";
+import { extractWindowFeatures } from "./ai/features";
+import { predictMatchState, type MatchPrediction } from "./ai/inference";
+import { explainMatchState, buildMatchRecap, type AudienceMode } from "./ai/explanations";
+import type { TeamId } from "./types/match";
 import "./App.css";
 
 // Generated once, outside React rendering.
@@ -73,6 +77,36 @@ function App() {
   const [replay, setReplay] = useState(() =>
     createReplayState(match),
   );
+
+  const [audience, setAudience] = useState<AudienceMode>("fan");
+  const [favoriteTeam, setFavoriteTeam] = useState<TeamId | "all">("all");
+  const [prediction, setPrediction] = useState<MatchPrediction | null>(null);
+  const [modelStatus, setModelStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [modelError, setModelError] = useState("");
+  const insightWindow = Math.floor(replay.elapsedSeconds / 15);
+
+  useEffect(() => {
+    let current = true;
+    const clock = Math.min(match.metadata.durationSeconds, insightWindow * 15);
+    predictMatchState(extractWindowFeatures(match, clock))
+      .then((result) => {
+        if (!current) return;
+        setPrediction(result);
+        setModelStatus("ready");
+        setModelError("");
+      })
+      .catch((error: unknown) => {
+        if (!current) return;
+        setPrediction(null);
+        setModelStatus("unavailable");
+        setModelError(error instanceof Error ? error.message : "Model could not be loaded");
+      });
+    return () => { current = false; };
+  }, [insightWindow]);
+
+  const windowFeatures = extractWindowFeatures(match, replay.elapsedSeconds);
+  const insight = explainMatchState(windowFeatures, modelStatus === "ready" ? prediction : null, audience, favoriteTeam, match);
+  const recap = buildMatchRecap(match, replay.elapsedSeconds);
 
   // Advance simulated time using measured real elapsed time.
   useEffect(() => {
@@ -233,6 +267,51 @@ function App() {
               </select>
             </label>
           </div>
+        </section>
+
+        <section className="mw-panel mw-intelligence" aria-label="Explainable Match Intelligence">
+          <div className="mw-section-title">
+            <h2>Explainable Match Intelligence</h2>
+            <span>ROLLING 3-MIN WINDOW</span>
+          </div>
+          <div className="mw-insight-controls">
+            <label htmlFor="audience-mode">Viewing mode
+              <select id="audience-mode" value={audience}
+                onChange={(event) => setAudience(event.target.value as AudienceMode)}>
+                <option value="fan">Fan — The story</option>
+                <option value="analyst">Analyst — Evidence and features</option>
+              </select>
+            </label>
+            <label htmlFor="focus-team">Team focus
+              <select id="focus-team" value={favoriteTeam}
+                onChange={(event) => setFavoriteTeam(event.target.value as TeamId | "all")}>
+                <option value="all">Both teams</option>
+                <option value="northbridge">Northbridge Rovers</option>
+                <option value="harborpoint">Harborpoint FC</option>
+              </select>
+            </label>
+          </div>
+          <p className="mw-model-status" role="status">
+            {modelStatus === "ready"
+              ? "Microsoft ONNX Runtime Web · WASM · Synthetic-trained classifier"
+              : modelStatus === "loading"
+                ? "Loading Microsoft ONNX model..."
+                : "AI unavailable — event statistics and recap remain active"}
+          </p>
+          <h3 className="mw-insight-headline">{insight.headline}</h3>
+          <p className="mw-insight-narrative">{insight.narrative}</p>
+          <p className="mw-why">{insight.whyItMatters}</p>
+          {modelStatus === "unavailable" && <small className="mw-error">Runtime error: {modelError}</small>}
+          <div className="mw-evidence" aria-label="Insight evidence">
+            {insight.evidence.map((datum) => <span key={datum}>{datum}</span>)}
+          </div>
+          {audience === "analyst" && <div className="mw-analyst-detail">
+            <strong>Traceable event IDs</strong>
+            <p>{insight.evidenceEventIds.join(", ") || "No events in this time window"}</p>
+            {prediction && modelStatus === "ready" && <p>Model scores: CONTROL {(prediction.probabilities[0] * 100).toFixed(1)}% · PRESSURE {(prediction.probabilities[1] * 100).toFixed(1)}% · TRANSITION {(prediction.probabilities[2] * 100).toFixed(1)}%</p>}
+          </div>}
+          <div className="mw-recap"><strong>Automated event recap</strong><p>{recap}</p></div>
+          <small className="mw-disclaimer">Demonstration: synthetic events and training labels. Model confidence is not real-world predictive accuracy; recap is generated from observed events.</small>
         </section>
 
         <div className="mw-grid">

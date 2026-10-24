@@ -53,3 +53,18 @@ jobs:
 
       - name: Verify integration
         run: node scripts/verifyIntegration.mjs
+
+      - name: Verify Phase 3 intelligence
+        run: node scripts/verifyIntelligence.mjs
+
+      # Disposable CI-only install; no package manifests or lockfile changes.
+      - name: Install pinned ONNX Runtime Web for smoke test
+        run: npm install --no-save --package-lock=false onnxruntime-web@1.23.2
+
+      - name: Verify actual ONNX WASM inference
+        run: node scripts/verifyOnnxRuntime.mjs
+
+      - name: Verify reproducible synthetic ONNX training
+        run: |
+          python3 scripts/train_match_state.py
+          git diff --exit-code -- src/ai/model.ts
