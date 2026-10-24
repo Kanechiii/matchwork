@@ -32,6 +32,6 @@ assert.equal(invalid.trace[2].status, "recovered");
 const thrown = await orchestrateMatchInsight(match, 180, async () => { throw new Error("model outage"); });
 assert.equal(thrown.recovered, true);
 assert.ok(thrown.evidenceEventIds.every(id => new Set(extractWindowFeatures(match, 180).eventIds).has(id)));
-assert.throws(() => orchestrateMatchInsight(match, -1), /Clock outside/);
+await assert.rejects(orchestrateMatchInsight(match, -1), /Clock outside/);
 await assert.rejects(orchestrateMatchInsight(match, 5401), /Clock outside/);
 console.log("WORKFLOW PROTOTYPE: PASS — specialist handoffs, temporal evidence, adapter success, invalid citation recovery, outage recovery, deterministic fallback");
