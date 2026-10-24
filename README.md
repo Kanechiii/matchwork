@@ -9,7 +9,7 @@ The project is designed to transform football event data into statistics, eviden
 
 ## Current Project Status
 
-**Phase 2: Synthetic Match Data and Replay — Implemented**
+**Phase 3: Synthetic Match Intelligence — Feature Development**
 
 The application currently supports:
 
@@ -25,6 +25,12 @@ The application currently supports:
 - Playback speeds of 1x, 4x, and 16x
 - Synchronized scoreboard, statistics, and event feed
 - Automated generator, statistics, replay, and integration verification
+- Rolling three-minute feature windows, based only on visible replay events
+- Compact synthetic-trained ONNX classification of control, pressure and transitions
+- Microsoft ONNX Runtime Web WASM inference when browser runtime is available
+- Explicit failure state when ONNX inference is unavailable
+- Event-grounded explanations, evidence IDs and generated match recaps
+- Separate Fan and Analyst presentations and team-focused narratives
 
 The implementation uses synthetic data only.
 
@@ -32,10 +38,7 @@ The implementation uses synthetic data only.
 
 The following features are not yet implemented:
 
-- Microsoft ONNX Runtime Web inference
-- AI-assisted match-state classification
-- Evidence-based explanations of match developments
-- Personalized Fan and Analyst viewing modes
+- Expanded AI inference and model validation with realistic synthetic match labels
 - Player-focused intelligence
 - Automated match narratives and recaps
 - Broadcast-style insight overlays
@@ -60,7 +63,7 @@ These capabilities will be developed in subsequent authorized phases.
 - Microsoft ONNX Runtime Web for browser inference
 - GitHub Pages for static application hosting
 
-GitHub Actions is being introduced for automated build and regression verification.
+GitHub Actions runs automated build and regression verification. Browser ONNX Runtime Web uses version-pinned CDN imports and WASM assets. A network connection is currently required for Microsoft AI inference.
 
 ## Project Structure
 
@@ -140,6 +143,28 @@ The integration suite verifies 12 combinations of seeds and event counts, coveri
 
 The verification scripts use Node.js built-in functionality and require no additional testing packages.
 
+## Explainable AI and Model Provenance
+
+The match-state model is a small ONNX logistic classifier (7 input features, 3 labels, 442-byte graph). It runs using Microsoft's ONNX Runtime Web WASM backend when the pinned public runtime resources load in the browser.
+
+The synthetic labels and training exemplars are deliberately generated from handcrafted state prototypes. Reproduce them without any Python dependencies:
+
+```bash
+python scripts/train_match_state.py
+```
+
+The model is an illustrative proof of ONNX inference and **has not been validated on real football data**. Synthetic-prototype validation accuracy does not measure performance on authentic matches.
+
+Prediction scores are **not** calibrated real-world probabilities. Explanations and recaps use deterministic templates grounded in observed synthetic event counts and IDs, not a generative language model. If the runtime fails to load, the dashboard transparently reports AI unavailable rather than fabricating inference.
+
+The classifier input contains passing continuity, pressure, turnover and shot rates, event tempo, final-third action share, and score tension. Only events up to the replay timestamp are used.
+
+### Phase 3 smoke test
+
+```bash
+node scripts/verifyIntelligence.mjs
+```
+
 ## Data Integrity and Limitations
 
 All teams, players, and events are fictional.
@@ -165,6 +190,7 @@ A GitHub Actions workflow checks:
 5. Statistics calculation
 6. Replay consistency
 7. Multi-seed integration
+8. Phase 3 intelligence feature extraction
 
 These are automated verification checks, not a deployment workflow.
 
