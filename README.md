@@ -145,7 +145,7 @@ The verification scripts use Node.js built-in functionality and require no addit
 
 ## Explainable AI and Model Provenance
 
-The match-state model is a small ONNX logistic classifier (7 input features, 3 labels, 442-byte graph). It runs using Microsoft's ONNX Runtime Web WASM backend when the pinned public runtime resources load in the browser.
+The match-state model is a small ONNX logistic classifier (7 input features, 3 labels, 340-byte graph). It runs using Microsoft's ONNX Runtime Web WASM backend when the pinned public runtime resources load in the browser.
 
 The synthetic labels and training exemplars are deliberately generated from handcrafted state prototypes. Reproduce them without any Python dependencies:
 
