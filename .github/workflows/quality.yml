@@ -63,3 +63,8 @@ jobs:
 
       - name: Verify actual ONNX WASM inference
         run: node scripts/verifyOnnxRuntime.mjs
+
+      - name: Verify reproducible synthetic ONNX training
+        run: |
+          python3 scripts/train_match_state.py
+          git diff --exit-code -- src/ai/model.ts
