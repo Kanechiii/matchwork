@@ -59,7 +59,7 @@ def vint(n):
         out.append((n & 127) | 128)
         n >>= 7
     out.append(n)
-    return bytes(out + bytes([n]))
+    return bytes(out)
 
 def field(n, content):
     return vint(n << 3 | 2) + vint(len(content)) + content
@@ -97,7 +97,7 @@ model = num(1, 9) + string(2, "Matchwork synthetic weak supervision v1") + field
 encoded = base64.b64encode(model).decode("ascii")
 out_path = Path(__file__).resolve().parents[1] / "src" / "ai" / "model.ts"
 out_path.write_text(
-    '/** Embedded 442-byte ONNX model (opset 13) with synthetic weak-supervision labels.\n'
+    '/** Embedded 340-byte ONNX model (opset 13) with synthetic weak-supervision labels.\n'
     ' * This classifier is illustrative and is not validated on real football data.\n'
     ' */\n'
     'export const EMBEDDED_ONNX_MODEL_BASE64 = "' + encoded + '";\n',
