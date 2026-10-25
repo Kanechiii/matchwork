@@ -81,6 +81,18 @@ export function loadMatchModel(): Promise<{ session: Session; ort: OrtApi }> {
   return cached;
 }
 
+/** Validate synthetic-model scores before the UI can display them. */
+export function validateModelScores(data: ArrayLike<number> | undefined): [number, number, number] {
+  if (!data || data.length !== 3) throw new Error("Unexpected ONNX model output");
+  const probabilities = Array.from(data) as [number, number, number];
+  const sum = probabilities.reduce((a, b) => a + b, 0);
+  if (probabilities.some((n) => !Number.isFinite(n) || n < 0 || n > 1) ||
+      !Number.isFinite(sum) || Math.abs(sum - 1) > 0.01) {
+    throw new Error("Invalid ONNX probabilities");
+  }
+  return probabilities;
+}
+
 export async function predictMatchState(features: WindowFeatures): Promise<MatchPrediction> {
   if (features.values.length !== 7 ||
       features.values.some((value) => !Number.isFinite(value) || value < 0 || value > 1)) {
@@ -89,13 +101,7 @@ export async function predictMatchState(features: WindowFeatures): Promise<Match
   const { session, ort } = await loadMatchModel();
   const input = new ort.Tensor("float32", Float32Array.from(features.values), [1, 7]);
   const output = await withTimeout(session.run({ features: input }), RUN_TIMEOUT_MS, "ONNX inference");
-  const data = output.probabilities?.data;
-  if (!data || data.length !== 3) throw new Error("Unexpected ONNX model output");
-  const probabilities = Array.from(data) as [number, number, number];
-  const sum = probabilities.reduce((a, b) => a + b, 0);
-  if (probabilities.some((n) => !Number.isFinite(n) || n < 0) || Math.abs(sum - 1) > 0.01) {
-    throw new Error("Invalid ONNX probabilities");
-  }
+  const probabilities = validateModelScores(output.probabilities?.data);
   const best = probabilities.indexOf(Math.max(...probabilities));
   return {
     label: STATE_LABELS[best],
