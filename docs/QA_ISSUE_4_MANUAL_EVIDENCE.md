@@ -60,3 +60,21 @@ Passing checks included:
 - [ ] Complete and document Fan/Analyst mode testing.
 
 **Status:** Manual QA partially complete. Awaiting remaining screenshots, Fan/Analyst testing and coordinated UI integration before final review.
+
+## Maintainer correction — sampled inference/UI integration
+
+The project lead applied a narrow shared-`App.tsx` correction for Issue #4 (coordinate any further UI edits with @Mark-Gerald in #3):
+- `src/ai/replayPresentation.ts` supplies 15-second sampling and a pure display selector. It rejects a prediction whose `asOfSeconds` disagrees with the active sample, so stale Analyst model scores cannot appear.
+- `src/App.tsx` uses one sampled timestamp for ONNX inference, evidence counts, explanations and Analyst scores. UI explicitly displays both **AI as of** and **replay** times. The scoreboard, match statistics, event feed and rule recap still update at the **live replay time**.
+- The UI connects `createPredictionRequestGate()` to React effect teardown and new requests. Results from superseded requests must not overwrite state after fast seeking. When a sample changes, its status becomes loading until an answer belongs to that sample.
+- A **Retry AI** control reruns failed attempts while paused (and while playing) without changing the replay clock.
+- `scripts/verifyIntelligence.mjs` tests 00:14→00:15→00:16→00:29→00:30, rewind, stale-score rejection, invalid clocks and the existing failure tests.
+
+**Evidence standard:** These are source and automated regression changes, not independently witnessed Chrome screenshots. Original manual QA screenshots, terminal output and complete Fan/Analyst verification remain to be supplied. GitHub CI result should be linked from the latest commit rather than an earlier run.
+
+### Updated manual browser acceptance
+1. Seek to 00:16: show **AI as of 00:15** and **replay 00:16**; when ready, the model scores and evidence must refer to **00:15**, while replay stats and recap refer to **00:16**.
+2. Seek 00:29 → 00:30 → 00:15 quickly: never show model scores belonging to a different 15-second sample. Repeat at half-time and full-time.
+3. In Fan and Analyst mode, switch team focus; no misleading model state or stale score text.
+4. Block `ort.min.mjs`, hard-refresh, observe honest AI unavailable and working deterministic panels; unblock, click **Retry AI**, and confirm eventual recovery or capture the residual browser error.
+5. Attach screenshots and local command output; document remaining issues.
