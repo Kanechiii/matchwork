@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { MatchEvent } from "./types/match";
 import { demoMatch } from "./data/demoMatch";
 import { generateSyntheticMatch } from "./engine/generateEvents";
@@ -14,8 +14,7 @@ import {
   setReplaySpeed,
 } from "./engine/replay";
 import { extractWindowFeatures } from "./ai/features";
-import { createPredictionRequestGate, predictMatchState } from "./ai/inference";
-import { sampleReplaySeconds, selectReplayInference, type ReplayInferenceState } from "./ai/replayPresentation";
+import { predictMatchState, type MatchPrediction } from "./ai/inference";
 import { explainMatchState, buildMatchRecap, type AudienceMode } from "./ai/explanations";
 import type { TeamId } from "./types/match";
 import "./App.css";
@@ -81,37 +80,32 @@ function App() {
 
   const [audience, setAudience] = useState<AudienceMode>("fan");
   const [favoriteTeam, setFavoriteTeam] = useState<TeamId | "all">("all");
-  const requestGate = useRef(createPredictionRequestGate());
-  const sampledSeconds = sampleReplaySeconds(replay.elapsedSeconds);
-  const [inference, setInference] = useState<ReplayInferenceState>({
-    asOfSeconds: 0, status: "loading", prediction: null, error: "",
-  });
-  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [prediction, setPrediction] = useState<MatchPrediction | null>(null);
+  const [modelStatus, setModelStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [modelError, setModelError] = useState("");
+  const insightWindow = Math.floor(replay.elapsedSeconds / 15);
 
   useEffect(() => {
-    const gate = requestGate.current;
-    const requestId = gate.next();
-    setInference({ asOfSeconds: sampledSeconds, status: "loading", prediction: null, error: "" });
-    predictMatchState(extractWindowFeatures(match, sampledSeconds))
+    let current = true;
+    const clock = Math.min(match.metadata.durationSeconds, insightWindow * 15);
+    predictMatchState(extractWindowFeatures(match, clock))
       .then((result) => {
-        if (!gate.isCurrent(requestId)) return;
-        setInference({ asOfSeconds: sampledSeconds, status: "ready", prediction: result, error: "" });
+        if (!current) return;
+        setPrediction(result);
+        setModelStatus("ready");
+        setModelError("");
       })
       .catch((error: unknown) => {
-        if (!gate.isCurrent(requestId)) return;
-        setInference({
-          asOfSeconds: sampledSeconds, status: "unavailable", prediction: null,
-          error: error instanceof Error ? error.message : "Model could not be loaded",
-        });
+        if (!current) return;
+        setPrediction(null);
+        setModelStatus("unavailable");
+        setModelError(error instanceof Error ? error.message : "Model could not be loaded");
       });
-    return () => { gate.invalidate(); };
-  }, [sampledSeconds, retryAttempt]);
+    return () => { current = false; };
+  }, [insightWindow]);
 
-  const currentInference = selectReplayInference(replay.elapsedSeconds, inference);
-  const { prediction, status: modelStatus, error: modelError } = currentInference;
-  // Only the AI panel is sampled. Scoreboard, statistics and recaps stay live.
-  const windowFeatures = extractWindowFeatures(match, sampledSeconds);
-  const insight = explainMatchState(windowFeatures, prediction, audience, favoriteTeam, match);
+  const windowFeatures = extractWindowFeatures(match, replay.elapsedSeconds);
+  const insight = explainMatchState(windowFeatures, modelStatus === "ready" ? prediction : null, audience, favoriteTeam, match);
   const recap = buildMatchRecap(match, replay.elapsedSeconds);
 
   // Advance simulated time using measured real elapsed time.
@@ -278,7 +272,7 @@ function App() {
         <section className="mw-panel mw-intelligence" aria-label="Explainable Match Intelligence">
           <div className="mw-section-title">
             <h2>Explainable Match Intelligence</h2>
-            <span>ROLLING 3-MIN WINDOW · AI AS OF {formatClock(sampledSeconds)} · REPLAY {formatClock(replay.elapsedSeconds)}</span>
+            <span>ROLLING 3-MIN WINDOW</span>
           </div>
           <div className="mw-insight-controls">
             <label htmlFor="audience-mode">Viewing mode
@@ -299,22 +293,22 @@ function App() {
           </div>
           <p className="mw-model-status" role="status">
             {modelStatus === "ready"
-              ? `Microsoft ONNX Runtime Web · WASM · Synthetic-trained classifier · As of ${formatClock(sampledSeconds)}`
+              ? "Microsoft ONNX Runtime Web · WASM · Synthetic-trained classifier"
               : modelStatus === "loading"
-                ? `Loading Microsoft ONNX model for ${formatClock(sampledSeconds)}...`
+                ? "Loading Microsoft ONNX model..."
                 : "AI unavailable — event statistics and recap remain active"}
           </p>
           <h3 className="mw-insight-headline">{insight.headline}</h3>
           <p className="mw-insight-narrative">{insight.narrative}</p>
           <p className="mw-why">{insight.whyItMatters}</p>
-          {modelStatus === "unavailable" && <div><small className="mw-error">Runtime error: {modelError}</small> <button type="button" onClick={() => setRetryAttempt((attempt) => attempt + 1)}>Retry AI</button></div>}
+          {modelStatus === "unavailable" && <small className="mw-error">Runtime error: {modelError}</small>}
           <div className="mw-evidence" aria-label="Insight evidence">
             {insight.evidence.map((datum) => <span key={datum}>{datum}</span>)}
           </div>
           {audience === "analyst" && <div className="mw-analyst-detail">
             <strong>Traceable event IDs</strong>
             <p>{insight.evidenceEventIds.join(", ") || "No events in this time window"}</p>
-            {prediction && modelStatus === "ready" && <p>Model scores as of {formatClock(sampledSeconds)} (synthetic-model scores): CONTROL {(prediction.probabilities[0] * 100).toFixed(1)}% · PRESSURE {(prediction.probabilities[1] * 100).toFixed(1)}% · TRANSITION {(prediction.probabilities[2] * 100).toFixed(1)}%</p>}
+            {prediction && modelStatus === "ready" && <p>Model scores: CONTROL {(prediction.probabilities[0] * 100).toFixed(1)}% · PRESSURE {(prediction.probabilities[1] * 100).toFixed(1)}% · TRANSITION {(prediction.probabilities[2] * 100).toFixed(1)}%</p>}
           </div>}
           <div className="mw-recap"><strong>Automated event recap</strong><p>{recap}</p></div>
           <small className="mw-disclaimer">Demonstration: synthetic events and training labels. Model confidence is not real-world predictive accuracy; recap is generated from observed events.</small>
