@@ -1,5 +1,5 @@
-import { EMBEDDED_ONNX_MODEL_BASE64 } from "./model";
-import { STATE_LABELS, type MatchStateLabel, type WindowFeatures } from "./features";
+import { EMBEDDED_ONNX_MODEL_BASE64 } from "./model.ts";
+import { STATE_LABELS, type MatchStateLabel, type WindowFeatures } from "./features.ts";
 
 export interface MatchPrediction {
   label: MatchStateLabel;
