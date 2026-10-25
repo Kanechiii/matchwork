@@ -3,7 +3,7 @@ import { demoMatch } from "../src/data/demoMatch.ts";
 import { generateSyntheticMatch } from "../src/engine/generateEvents.ts";
 import { extractWindowFeatures, FEATURE_NAMES } from "../src/ai/features.ts";
 import { buildMatchRecap, explainMatchState } from "../src/ai/explanations.ts";
-import { createPredictionRequestGate } from "../src/ai/inference.ts";
+import { createPredictionRequestGate, createRetryableModelLoader } from "../src/ai/inference.ts";
 const match = generateSyntheticMatch(demoMatch);
 assert.equal(FEATURE_NAMES.length, 7);
 let prev = null;
@@ -51,4 +51,33 @@ const stalePrediction = { label: "CONTROL", probabilities: [1, 0, 0], confidence
 assert.equal(explainMatchState(extractWindowFeatures(match, 16), stalePrediction, "analyst", "all", match).modelBacked, false);
 assert.equal(explainMatchState(at15, stalePrediction, "analyst", "all", match).modelBacked, true);
 assert.throws(() => buildMatchRecap(match, 5401));
-console.log("MATCHWORK INTELLIGENCE: PASS — boundaries, counts, evidence, seeking, as-of timestamps, recap");
+
+// Simulated CDN outage: callers share one failed attempt, then a new one succeeds.
+let loadCalls = 0;
+const intermittentLoad = createRetryableModelLoader(async () => {
+  loadCalls += 1;
+  if (loadCalls === 1) throw new Error("Simulated CDN outage");
+  return "loaded";
+}, 100, "Synthetic CDN");
+const firstBatch = await Promise.allSettled([intermittentLoad(), intermittentLoad()]);
+assert.deepEqual(firstBatch.map(result => result.status), ["rejected", "rejected"]);
+assert.equal(loadCalls, 1, "Concurrent requests must share one load");
+assert.equal(await intermittentLoad(), "loaded");
+assert.equal(await intermittentLoad(), "loaded");
+assert.equal(loadCalls, 2, "Successful session must remain cached");
+
+// Simulated stalled WASM initialization: timeout must clear the stale attempt.
+let timeoutAttempts = 0;
+const stalledLoad = createRetryableModelLoader(() => {
+  timeoutAttempts += 1;
+  if (timeoutAttempts === 1) return new Promise(() => {});
+  return Promise.resolve("recovered");
+}, 20, "Synthetic WASM session");
+await assert.rejects(stalledLoad(), /timed out/);
+assert.equal(await stalledLoad(), "recovered");
+assert.equal(timeoutAttempts, 2);
+
+assert.equal(explainMatchState(at15, {
+  ...stalePrediction, asOfSeconds: 30,
+}, "analyst", "all", match).modelBacked, false, "Future predictions must be rejected");
+console.log("MATCHWORK INTELLIGENCE: PASS — boundaries, counts, evidence, seeking, as-of timestamps, timeout and failure recovery");
