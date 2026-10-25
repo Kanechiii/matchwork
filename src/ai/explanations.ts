@@ -65,9 +65,11 @@ export function explainMatchState(
 
   if (!validPrediction) {
     return {
-      headline: "Match intelligence unavailable",
-      narrative: `Event statistics are still available for ${audience} (${start}–${end}).`,
-      whyItMatters: "AI classification requires ONNX Runtime Web. No prediction is fabricated when it cannot load.",
+      headline: prediction ? "Prediction pending for current replay time" : "Match intelligence unavailable",
+      narrative: `Observed event statistics remain available for ${audience} (${start}–${end}).`,
+      whyItMatters: prediction
+        ? `Previous synthetic-model output was as of ${fmt(prediction.asOfSeconds)}; it is not evidence for the current ${end} replay time.`
+        : "AI classification requires ONNX Runtime Web. No prediction is fabricated when it cannot load.",
       evidence, evidenceEventIds, state: "AWAITING_MODEL",
       confidence: null, modelBacked: false,
     };
