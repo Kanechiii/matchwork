@@ -45,17 +45,25 @@ export function explainMatchState(
 
   // Cite the actual observed triggering events rather than inventing a reason.
   const ids = new Set(features.eventIds);
-  const relevant = match.events.filter((event) =>
-    ids.has(event.id) &&
-    ["shot", "pressure", "possession_change", "pass"].includes(event.type),
-  );
+  const seen = new Set<string>();
+  const relevant = match.events.filter((event) => {
+    if (!ids.has(event.id) || seen.has(event.id) ||
+        event.elapsedSeconds < features.startSeconds ||
+        event.elapsedSeconds > features.endSeconds ||
+        !["shot", "pressure", "possession_change", "pass"].includes(event.type)) return false;
+    seen.add(event.id);
+    return true;
+  }).sort((a, b) => a.elapsedSeconds - b.elapsedSeconds || a.sequence - b.sequence);
   const evidenceEventIds = relevant.slice(-5).map((event) => event.id);
-  const heading = prediction ? labelFor(prediction.label) : "Model not available";
+  // A prediction from an earlier inference window must never be described
+  // as a classification of this newer observation window.
+  const validPrediction = prediction?.asOfSeconds === features.endSeconds ? prediction : null;
+  const heading = validPrediction ? labelFor(validPrediction.label) : "Model not available";
   const start = fmt(features.startSeconds);
   const end = fmt(features.endSeconds);
   const audience = favoriteTeam === "all" ? "the match" : clubName;
 
-  if (!prediction) {
+  if (!validPrediction) {
     return {
       headline: "Match intelligence unavailable",
       narrative: `Event statistics are still available for ${audience} (${start}–${end}).`,
@@ -72,20 +80,27 @@ export function explainMatchState(
   return {
     headline: heading,
     narrative: mode === "fan"
-      ? `${heading} around ${audience}. ${descriptions[prediction.label]}`
-      : `${heading} (${(prediction.confidence * 100).toFixed(1)}% synthetic-model score), ${start}–${end}. ${descriptions[prediction.label]}`,
+      ? `${heading} around ${audience}. ${descriptions[validPrediction.label]}`
+      : `${heading} (${(validPrediction.confidence * 100).toFixed(1)}% synthetic-model score), ${start}–${end}. ${descriptions[validPrediction.label]}`,
     whyItMatters: mode === "fan"
       ? "This helps explain the rhythm behind the scoreline, not just the latest event."
       : `Features: completion=${features.values[0].toFixed(2)}, pressure=${features.values[1].toFixed(2)}, turnovers=${features.values[2].toFixed(2)}, shots=${features.values[3].toFixed(2)}, tempo=${features.values[4].toFixed(2)}, territory=${features.values[5].toFixed(2)}, tension=${features.values[6].toFixed(2)}. Scores are model outputs, not calibrated real-world probabilities.`,
     evidence, evidenceEventIds,
-    state: prediction.label, confidence: prediction.confidence,
+    state: validPrediction.label, confidence: validPrediction.confidence,
     modelBacked: true,
   };
 }
 
 /** Recap is explicitly rule-generated from observed synthetic events. */
 export function buildMatchRecap(match: SyntheticMatch, untilSeconds: number): string {
-  const visible = match.events.filter((e) => e.elapsedSeconds <= untilSeconds);
+  if (!Number.isSafeInteger(untilSeconds) || untilSeconds < 0 ||
+      untilSeconds > match.metadata.durationSeconds) throw new Error("Invalid recap time");
+  const seen = new Set<string>();
+  const visible = match.events.filter((e) => {
+    if (e.elapsedSeconds > untilSeconds || seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
+  }).sort((a, b) => a.elapsedSeconds - b.elapsedSeconds || a.sequence - b.sequence);
   const shots = visible.filter((e) => e.type === "shot");
   const goals = shots.filter((e) => e.type === "shot" && e.outcome === "goal");
   const pressure = visible.filter((e) => e.type === "pressure").length;
