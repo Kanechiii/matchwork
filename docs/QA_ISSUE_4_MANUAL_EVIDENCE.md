@@ -49,7 +49,7 @@ Passing checks included:
 
 ## Known Limitations
 
-- The `App.tsx` integration of the request-epoch guard and explicit prediction as-of timestamp is still pending coordination with @Mark-Gerald.
+- React-side request-epoch integration, explicit sampled prediction timestamps and score presentation are assigned to Issue #3 (@Mark-Gerald); PR #8 retains AI-layer safeguards only.
 - Manual rapid-seek success does not establish that every possible asynchronous race condition is prevented.
 - The initial unavailable state after unblocking the CDN needs further investigation if reproducible.
 
@@ -61,20 +61,6 @@ Passing checks included:
 
 **Status:** Manual QA partially complete. Awaiting remaining screenshots, Fan/Analyst testing and coordinated UI integration before final review.
 
-## Maintainer correction — sampled inference/UI integration
+## Scope clarification — React changes moved to Issue #3
 
-The project lead applied a narrow shared-`App.tsx` correction for Issue #4 (coordinate any further UI edits with @Mark-Gerald in #3):
-- `src/ai/replayPresentation.ts` supplies 15-second sampling and a pure display selector. It rejects a prediction whose `asOfSeconds` disagrees with the active sample, so stale Analyst model scores cannot appear.
-- `src/App.tsx` uses one sampled timestamp for ONNX inference, evidence counts, explanations and Analyst scores. UI explicitly displays both **AI as of** and **replay** times. The scoreboard, match statistics, event feed and rule recap still update at the **live replay time**.
-- The UI connects `createPredictionRequestGate()` to React effect teardown and new requests. Results from superseded requests must not overwrite state after fast seeking. When a sample changes, its status becomes loading until an answer belongs to that sample.
-- A **Retry AI** control reruns failed attempts while paused (and while playing) without changing the replay clock.
-- `scripts/verifyIntelligence.mjs` tests 00:14→00:15→00:16→00:29→00:30, rewind, stale-score rejection, invalid clocks and the existing failure tests.
-
-**Evidence standard:** These are source and automated regression changes, not independently witnessed Chrome screenshots. Original manual QA screenshots, terminal output and complete Fan/Analyst verification remain to be supplied. GitHub CI result should be linked from the latest commit rather than an earlier run.
-
-### Updated manual browser acceptance
-1. Seek to 00:16: show **AI as of 00:15** and **replay 00:16**; when ready, the model scores and evidence must refer to **00:15**, while replay stats and recap refer to **00:16**.
-2. Seek 00:29 → 00:30 → 00:15 quickly: never show model scores belonging to a different 15-second sample. Repeat at half-time and full-time.
-3. In Fan and Analyst mode, switch team focus; no misleading model state or stale score text.
-4. Block `ort.min.mjs`, hard-refresh, observe honest AI unavailable and working deterministic panels; unblock, click **Retry AI**, and confirm eventual recovery or capture the residual browser error.
-5. Attach screenshots and local command output; document remaining issues.
+The earlier maintainer UI patch was reverted from this PR because it introduced the React lint warning `react(set-state-in-effect)` and overlaps the UI ownership in #3. The PR no longer changes `src/App.tsx` or includes the UI-only `src/ai/replayPresentation.ts` helper. The model's `asOfSeconds`, score validation, evidence integrity and retryable loader remain in this PR. Mark-Gerald will coordinate React integration and browser acceptance with gyryan. No claim of completed UI acceptance is made.
