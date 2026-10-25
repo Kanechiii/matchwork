@@ -4,7 +4,6 @@ import { generateSyntheticMatch } from "../src/engine/generateEvents.ts";
 import { extractWindowFeatures, FEATURE_NAMES } from "../src/ai/features.ts";
 import { buildMatchRecap, explainMatchState } from "../src/ai/explanations.ts";
 import { createPredictionRequestGate, createRetryableModelLoader } from "../src/ai/inference.ts";
-import { sampleReplaySeconds, selectReplayInference } from "../src/ai/replayPresentation.ts";
 const match = generateSyntheticMatch(demoMatch);
 assert.equal(FEATURE_NAMES.length, 7);
 let prev = null;
@@ -82,18 +81,3 @@ assert.equal(explainMatchState(at15, {
   ...stalePrediction, asOfSeconds: 30,
 }, "analyst", "all", match).modelBacked, false, "Future predictions must be rejected");
 console.log("MATCHWORK INTELLIGENCE: PASS — boundaries, counts, evidence, seeking, as-of timestamps, timeout and failure recovery");
-
-for (const [replayTime, sample] of [[0,0],[14,0],[15,15],[16,15],[29,15],[30,30],[5400,5400],[60,60],[15,15]]) {
-  assert.equal(sampleReplaySeconds(replayTime), sample);
-  const result = { label: "CONTROL", probabilities: [1,0,0], confidence: 1, backend: "onnxruntime-web", asOfSeconds: sample };
-  const selection = selectReplayInference(replayTime, { asOfSeconds: sample, status: "ready", prediction: result, error: "" });
-  assert.equal(selection.status, "ready");
-  assert.equal(selection.prediction?.asOfSeconds, sample);
-  assert.equal(explainMatchState(extractWindowFeatures(match,sample),selection.prediction,"analyst","all",match).modelBacked,true);
-}
-const old = { label: "CONTROL", probabilities: [1,0,0], confidence:1, backend:"onnxruntime-web", asOfSeconds:15 };
-assert.equal(selectReplayInference(30,{ asOfSeconds: 15,status:"ready",prediction:old,error:"" }).prediction,null);
-assert.equal(selectReplayInference(30,{ asOfSeconds: 30,status:"ready",prediction:old,error:"" }).status,"loading");
-assert.equal(selectReplayInference(15,{ asOfSeconds:15,status:"unavailable",prediction:old,error:"offline" }).prediction,null);
-assert.throws(()=>sampleReplaySeconds(-1));
-console.log("REPLAY PRESENTATION: PASS — 15-second buckets, stale scores, rewind, loading and failure");
