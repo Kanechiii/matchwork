@@ -6,6 +6,8 @@ export interface MatchPrediction {
   probabilities: [number, number, number];
   confidence: number;
   backend: "onnxruntime-web";
+  /** Replay timestamp whose observed features produced this result. */
+  asOfSeconds: number;
 }
 
 interface OutputTensor { data: Float32Array | number[] }
@@ -23,6 +25,28 @@ interface OrtApi {
 const VERSION = "1.23.2";
 const CDN_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${VERSION}/dist/`;
 let cached: Promise<{ session: Session; ort: OrtApi }> | null = null;
+const LOAD_TIMEOUT_MS = 12000;
+const RUN_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`${operation} timed out`)), ms);
+    promise.then(
+      value => { clearTimeout(timeout); resolve(value); },
+      error => { clearTimeout(timeout); reject(error); },
+    );
+  });
+}
+
+/** Request epoch guard for consumers that seek rapidly (including away and back). */
+export function createPredictionRequestGate() {
+  let epoch = 0;
+  return {
+    next: () => ++epoch,
+    isCurrent: (requestId: number) => requestId === epoch,
+    invalidate: () => { ++epoch; },
+  };
+}
 
 function decodeModel(): Uint8Array {
   const binary = atob(EMBEDDED_ONNX_MODEL_BASE64);
@@ -36,7 +60,7 @@ function decodeModel(): Uint8Array {
  */
 export function loadMatchModel(): Promise<{ session: Session; ort: OrtApi }> {
   if (!cached) {
-    cached = (async () => {
+    const pending = withTimeout((async () => {
       // Vite preserves this runtime ESM import instead of resolving a Node package.
       const url = `${CDN_BASE}ort.min.mjs`;
       const ort = (await import(/* @vite-ignore */ url)) as OrtApi;
@@ -46,10 +70,13 @@ export function loadMatchModel(): Promise<{ session: Session; ort: OrtApi }> {
         executionProviders: ["wasm"],
       });
       return { session, ort };
-    })().catch((error: unknown) => {
-      cached = null;
+    })(), LOAD_TIMEOUT_MS, "ONNX model loading");
+    cached = pending.catch((error: unknown) => {
+      // Don't clear a newer retry if an earlier attempt finishes late.
+      if (cached === wrapped) cached = null;
       throw error;
     });
+    const wrapped = cached;
   }
   return cached;
 }
@@ -61,7 +88,7 @@ export async function predictMatchState(features: WindowFeatures): Promise<Match
   }
   const { session, ort } = await loadMatchModel();
   const input = new ort.Tensor("float32", Float32Array.from(features.values), [1, 7]);
-  const output = await session.run({ features: input });
+  const output = await withTimeout(session.run({ features: input }), RUN_TIMEOUT_MS, "ONNX inference");
   const data = output.probabilities?.data;
   if (!data || data.length !== 3) throw new Error("Unexpected ONNX model output");
   const probabilities = Array.from(data) as [number, number, number];
@@ -75,5 +102,6 @@ export async function predictMatchState(features: WindowFeatures): Promise<Match
     probabilities,
     confidence: probabilities[best],
     backend: "onnxruntime-web",
+    asOfSeconds: features.endSeconds,
   };
 }
