@@ -24,7 +24,6 @@ interface OrtApi {
 
 const VERSION = "1.23.2";
 const CDN_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${VERSION}/dist/`;
-let cached: Promise<{ session: Session; ort: OrtApi }> | null = null;
 const LOAD_TIMEOUT_MS = 12000;
 const RUN_TIMEOUT_MS = 8000;
 
@@ -58,27 +57,44 @@ function decodeModel(): Uint8Array {
  * Dependency is version-pinned; the UI explicitly reports failures, rather
  * than passing a rule-based result off as an AI prediction.
  */
-export function loadMatchModel(): Promise<{ session: Session; ort: OrtApi }> {
-  if (!cached) {
-    const pending = withTimeout((async () => {
-      // Vite preserves this runtime ESM import instead of resolving a Node package.
-      const url = `${CDN_BASE}ort.min.mjs`;
-      const ort = (await import(/* @vite-ignore */ url)) as OrtApi;
-      ort.env.wasm.wasmPaths = CDN_BASE;
-      ort.env.wasm.numThreads = 1;
-      const session = await ort.InferenceSession.create(decodeModel(), {
-        executionProviders: ["wasm"],
-      });
-      return { session, ort };
-    })(), LOAD_TIMEOUT_MS, "ONNX model loading");
-    cached = pending.catch((error: unknown) => {
-      // Don't clear a newer retry if an earlier attempt finishes late.
-      if (cached === wrapped) cached = null;
+/**
+ * Single-flight loader with bounded waiting and retry after a failed or
+ * timed-out attempt. Late completion of an expired attempt cannot be cached.
+ * Exported to test CDN/WASM failure recovery without a network dependency.
+ */
+export function createRetryableModelLoader<T>(
+  load: () => Promise<T>,
+  timeoutMs: number,
+  description: string,
+): () => Promise<T> {
+  let cached: Promise<T> | null = null;
+  return () => {
+    if (cached) return cached;
+    const pending = withTimeout(Promise.resolve().then(load), timeoutMs, description);
+    let attempt: Promise<T>;
+    attempt = pending.catch((error: unknown) => {
+      if (cached === attempt) cached = null;
       throw error;
     });
-    const wrapped = cached;
-  }
-  return cached;
+    cached = attempt;
+    return attempt;
+  };
+}
+
+const getSession = createRetryableModelLoader(async () => {
+  // Vite preserves this runtime ESM import instead of resolving a Node package.
+  const url = `${CDN_BASE}ort.min.mjs`;
+  const ort = (await import(/* @vite-ignore */ url)) as OrtApi;
+  ort.env.wasm.wasmPaths = CDN_BASE;
+  ort.env.wasm.numThreads = 1;
+  const session = await ort.InferenceSession.create(decodeModel(), {
+    executionProviders: ["wasm"],
+  });
+  return { session, ort };
+}, LOAD_TIMEOUT_MS, "ONNX model loading");
+
+export function loadMatchModel(): Promise<{ session: Session; ort: OrtApi }> {
+  return getSession();
 }
 
 /** Validate synthetic-model scores before the UI can display them. */
