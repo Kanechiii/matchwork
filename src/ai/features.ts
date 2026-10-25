@@ -51,10 +51,15 @@ export function extractWindowFeatures(
     throw new Error("Invalid feature window");
   }
   const startSeconds = Math.max(0, elapsedSeconds - lookbackSeconds);
-  const events = match.events.filter(
-    (event) => event.elapsedSeconds <= elapsedSeconds &&
-      event.elapsedSeconds >= startSeconds,
-  );
+  // Deduplicate by event ID and use chronological order even if an upstream
+  // fixture arrives unsorted. Counts and evidence must describe the same set.
+  const seen = new Set<string>();
+  const events = match.events.filter((event) => {
+    if (event.elapsedSeconds > elapsedSeconds ||
+        event.elapsedSeconds < startSeconds || seen.has(event.id)) return false;
+    seen.add(event.id);
+    return true;
+  }).sort((a, b) => a.elapsedSeconds - b.elapsedSeconds || a.sequence - b.sequence);
   const passes = events.filter((e) => e.type === "pass");
   const completed = passes.filter((e) => e.type === "pass" && e.completed).length;
   const pressures = events.filter((e) => e.type === "pressure").length;
@@ -66,8 +71,10 @@ export function extractWindowFeatures(
 
   let homeGoals = 0;
   let awayGoals = 0;
+  const scored = new Set<string>();
   for (const event of match.events) {
-    if (event.elapsedSeconds > elapsedSeconds) break;
+    if (event.elapsedSeconds > elapsedSeconds || scored.has(event.id)) continue;
+    scored.add(event.id);
     if (event.type === "shot" && event.outcome === "goal") {
       if (event.teamId === match.metadata.homeTeam.id) homeGoals += 1;
       else awayGoals += 1;
@@ -81,7 +88,7 @@ export function extractWindowFeatures(
     clamp01((pressures / n) / 0.24),
     clamp01((turnovers / n) / 0.22),
     clamp01((shots / n) / 0.12),
-    clamp01((events.length / Math.max(30, Math.min(180, elapsedSeconds))) / 0.34),
+    clamp01((events.length / Math.max(30, Math.min(lookbackSeconds, elapsedSeconds))) / 0.34),
     attacking / n,
     1 / (1 + Math.abs(homeGoals - awayGoals)),
   ];
