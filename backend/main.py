@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -5,9 +6,10 @@ from typing import Any, Literal
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from openai import OpenAIError
 
+from .ai_budget import foundry_budget
 from .foundry_service import explain_match_event
 
 
@@ -30,8 +32,23 @@ class MatchEvidence(BaseModel):
         max_length=30
     )
     statistics: dict[str, Any] = Field(
-        default_factory=dict
+        default_factory=dict,
+        max_length=25
     )
+
+    @field_validator("evidence_ids")
+    @classmethod
+    def limit_evidence_id_size(cls, values: list[str]) -> list[str]:
+        if any(len(value) > 100 for value in values):
+            raise ValueError("Evidence IDs must be at most 100 characters")
+        return values
+
+    @field_validator("statistics")
+    @classmethod
+    def limit_statistics_size(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if len(json.dumps(value, ensure_ascii=False).encode("utf-8")) > 2048:
+            raise ValueError("Statistics must be at most 2048 bytes")
+        return value
 
 
 class InsightRequest(BaseModel):
@@ -82,11 +99,18 @@ async def health():
 async def generate_insight(
     request: InsightRequest
 ):
-    evidence = request.event.model_dump()
+    fallback_status = foundry_budget.acquire()
+    if fallback_status is not None:
+        return InsightResponse(
+            source="rule-based",
+            explanation=request.fallback_text,
+            evidence_ids=request.event.evidence_ids,
+            status=fallback_status
+        )
 
     try:
         explanation = await explain_match_event(
-            evidence,
+            request.event.model_dump(),
             request.audience
         )
 
@@ -97,13 +121,15 @@ async def generate_insight(
             status="success"
         )
 
-    except (OpenAIError, RuntimeError):
+    except (OpenAIError, RuntimeError, KeyError):
         return InsightResponse(
             source="rule-based",
             explanation=request.fallback_text,
             evidence_ids=request.event.evidence_ids,
             status="ai_unavailable"
         )
+    finally:
+        foundry_budget.release()
 
 # Serve the production React application.
 FRONTEND_DIR = (
