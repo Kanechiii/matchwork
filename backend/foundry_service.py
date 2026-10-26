@@ -46,7 +46,7 @@ async def explain_match_event(
             "football explanation for a casual fan."
         )
 
-    response = await client.responses.create(
+    response = await get_foundry_client().responses.create(
         model=os.environ["AZURE_OPENAI_DEPLOYMENT"],
         instructions=(
             "You are Matchwork's football intelligence "
