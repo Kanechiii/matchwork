@@ -18,6 +18,11 @@ import { predictMatchState, type MatchPrediction } from "./ai/inference";
 import { explainMatchState, buildMatchRecap, type AudienceMode } from "./ai/explanations";
 import type { TeamId } from "./types/match";
 import "./App.css";
+import {
+  requestMatchInsight,
+  type MatchEvidence,
+  type MatchInsight,
+} from "./services/matchworkAI";
 
 // Generated once, outside React rendering.
 const match = generateSyntheticMatch(demoMatch);
@@ -81,6 +86,19 @@ function App() {
   const [audience, setAudience] = useState<AudienceMode>("fan");
   const [favoriteTeam, setFavoriteTeam] = useState<TeamId | "all">("all");
   const [prediction, setPrediction] = useState<MatchPrediction | null>(null);
+  
+const [aiResponse, setAiResponse] = useState<{
+  key: string;
+  result: MatchInsight;
+} | null>(null);
+
+const visibleKey =
+  `${replay.elapsedSeconds}:${replay.status}:${audience}`;
+
+const visibleAiInsight =
+  aiResponse?.key === visibleKey
+    ? aiResponse.result
+    : null;
   const [modelStatus, setModelStatus] = useState<"loading" | "ready" | "unavailable">("loading");
   const [modelError, setModelError] = useState("");
   const insightWindow = Math.floor(replay.elapsedSeconds / 15);
@@ -133,6 +151,102 @@ function App() {
   const { home, away } = frame.stats;
 
   const isPlaying = replay.status === "playing";
+    
+  
+useEffect(() => {
+  // Generate Foundry explanations only when paused
+  // or when the replay has finished.
+  if (replay.status === "playing") return;
+
+  const controller = new AbortController();
+
+  const currentFrame = getReplayFrame(match, replay);
+  const event = currentFrame.latestEvent;
+
+  if (!event) return;
+
+  const features = extractWindowFeatures(
+    match,
+    replay.elapsedSeconds
+  );
+
+  // Identifies the state this request belongs to.
+  const requestKey =
+    `${replay.elapsedSeconds}:${replay.status}:${audience}`;
+
+  const eventEvidence: MatchEvidence = {
+    minute: replay.elapsedSeconds / 60,
+    event_type: event.type,
+    team:
+      event.teamId === match.metadata.homeTeam.id
+        ? match.metadata.homeTeam.name
+        : match.metadata.awayTeam.name,
+    description:
+      `Latest event: ${describeEvent(event)}. ` +
+      `Rolling three-minute window: ` +
+      `${features.passesCompleted} of ` +
+      `${features.passesAttempted} passes completed, ` +
+      `${features.shots} shots, ` +
+      `${features.pressures} pressures, ` +
+      `${features.turnovers} possession changes.`,
+    score:
+      `${currentFrame.stats.home.goals}-` +
+      `${currentFrame.stats.away.goals}`,
+    evidence_ids: features.eventIds.slice(-5),
+    statistics: {
+      passes_attempted: features.passesAttempted,
+      passes_completed: features.passesCompleted,
+      shots: features.shots,
+      pressures: features.pressures,
+      turnovers: features.turnovers
+    }
+  };
+
+  const fallbackText = buildMatchRecap(
+    match,
+    replay.elapsedSeconds
+  );
+
+  const timer = window.setTimeout(() => {
+    requestMatchInsight(
+      eventEvidence,
+      fallbackText,
+      audience,
+      controller.signal
+    )
+      .then((result) => {
+        if (controller.signal.aborted) return;
+
+        setAiResponse({
+          key: requestKey,
+          result
+        });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+
+        console.error(
+          "Microsoft Foundry unavailable:",
+          error
+        );
+
+        setAiResponse({
+          key: requestKey,
+          result: {
+            source: "rule-based",
+            explanation: fallbackText,
+            evidence_ids: eventEvidence.evidence_ids,
+            status: "ai_unavailable"
+          }
+        });
+      });
+  }, 600);
+
+  return () => {
+    window.clearTimeout(timer);
+    controller.abort();
+  };
+}, [replay, audience]);
 
   return (
     <main className="mw-app">
@@ -301,6 +415,28 @@ function App() {
           <h3 className="mw-insight-headline">{insight.headline}</h3>
           <p className="mw-insight-narrative">{insight.narrative}</p>
           <p className="mw-why">{insight.whyItMatters}</p>
+          <div className="mw-recap">
+            <strong>
+              {visibleAiInsight?.source === "foundry"
+                ? "Microsoft Foundry AI Explanation"
+                : "Match Narrative"}
+            </strong>
+
+            <p>
+              {visibleAiInsight?.explanation ??
+                insight.narrative}
+            </p>
+
+            <small>
+              {visibleAiInsight?.source === "foundry"
+                ? "Generated using Microsoft Foundry"
+                : replay.status === "playing"
+                  ? "Pause replay for an AI explanation"
+                  : visibleAiInsight?.source === "rule-based"
+                    ? "Rule-based fallback — Foundry unavailable"
+                    : "Rule-based explanation"}
+            </small>
+          </div>
           {modelStatus === "unavailable" && <small className="mw-error">Runtime error: {modelError}</small>}
           <div className="mw-evidence" aria-label="Insight evidence">
             {insight.evidence.map((datum) => <span key={datum}>{datum}</span>)}
