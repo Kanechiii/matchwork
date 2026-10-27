@@ -111,3 +111,17 @@
 .mw-analyst .mw-pagehead h1{font-size:clamp(25px,2.6vw,36px);}
 @media(max-width:760px){.mw-scoreboard{grid-template-columns:minmax(0,1fr) minmax(100px,140px) minmax(0,1fr);gap:8px;margin:22px auto}.mw-score{font-size:clamp(36px,8.2vw,54px);gap:6px}.mw-team h2{font-size:12px}.mw-score-time{font-size:14px}.mw-match-round{font-size:8px;letter-spacing:.5px;}}
 @media(max-width:410px){.mw-scoreboard{grid-template-columns:minmax(0,1fr) minmax(88px,120px) minmax(0,1fr);gap:4px}.mw-score{font-size:clamp(31px,9vw,42px);letter-spacing:-1px;gap:4px}.mw-team h2{font-size:10px}.mw-team small{font-size:8px}.mw-crest{width:42px;height:42px}.mw-score-time{font-size:12px;gap:5px}.mw-score-time span:last-child{font-size:10px}.mw-stat{grid-template-columns:minmax(55px,1fr) minmax(0,1.2fr) minmax(55px,1fr)}}
+
+
+/* Stable score layout: React now uses team-scoped keys and fixed digit slots. */
+.mw-scoreboard{grid-template-columns:minmax(0,1fr) minmax(110px,190px) minmax(0,1fr);}
+.mw-score-center{isolation:isolate;min-width:0;overflow:visible;}
+.mw-score{font-variant-numeric:tabular-nums;letter-spacing:0;gap:clamp(6px,1.2vw,12px);}
+.mw-score .mw-goal-number{display:inline-flex;align-items:center;justify-content:center;flex:0 0 1ch;min-width:1ch;max-width:1.3ch;white-space:nowrap;animation:mw-score-pop .32s cubic-bezier(.2,.8,.2,1) both;}
+.mw-score .mw-score-divider{display:inline-flex;align-items:center;justify-content:center;flex:0 0 .3ch;line-height:1;}
+.mw-match-panel:hover{border-color:#58745a;box-shadow:0 24px 72px #0005;transition:border-color .25s,box-shadow .25s;}
+.mw-panel{transition:border-color .25s,box-shadow .25s,transform .25s;}
+.mw-panel:hover{border-color:#4a6558;box-shadow:0 18px 40px #0003;transform:translateY(-2px);}
+@media(max-width:760px){.mw-scoreboard{grid-template-columns:minmax(0,1fr) minmax(88px,135px) minmax(0,1fr)}}
+@media(max-width:410px){.mw-scoreboard{grid-template-columns:minmax(0,1fr) minmax(82px,112px) minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.mw-panel:hover{transform:none}}
