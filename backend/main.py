@@ -155,7 +155,7 @@ async def generate_insight(
         return InsightResponse(
             source="rule-based",
             explanation=fallback,
-            evidence_ids=request.event.evidence_ids,
+            evidence_ids=evidence["evidence_ids"],
             status="ai_unavailable"
         )
     finally:
