@@ -63,18 +63,7 @@ function describeEvent(event: MatchEvent): string {
   }
 }
 
-function App() {
-  const [page, setPage] = useState<"landing" | "studio">(
-    () => window.location.hash.startsWith("#/studio") ? "studio" : "landing",
-  );
-  useEffect(() => {
-    const onRouteChange = () => {
-      setPage(window.location.hash.startsWith("#/studio") ? "studio" : "landing");
-      window.scrollTo({ top: 0, behavior: "instant" });
-    };
-    window.addEventListener("hashchange", onRouteChange);
-    return () => window.removeEventListener("hashchange", onRouteChange);
-  }, []);
+function MatchStudio() {
   const [replay, setReplay] = useState(() =>
     createReplayState(match),
   );
@@ -266,8 +255,6 @@ useEffect(() => {
   const visibleEvents = frame.recentEvents.slice().reverse();
   const onSeek = (time: number) => setReplay((current) => seekReplay(current, match, time));
 
-  if (page === "landing") return <LandingPage match={match} />;
-
   return (
     <main className={`mw-app ${isAnalyst ? "mw-analyst" : "mw-fan"}`}>
       <div className="mw-ambient mw-ambient-one" aria-hidden="true" />
@@ -377,6 +364,29 @@ useEffect(() => {
       </div>
     </main>
   );
+}
+
+function App() {
+  const [page, setPage] = useState<"landing" | "studio">(
+    () => window.location.hash.startsWith("#/studio") ? "studio" : "landing",
+  );
+
+  useEffect(() => {
+    const onRouteChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith("#/studio")) {
+        setPage("studio");
+        window.scrollTo(0, 0);
+      } else if (hash === "#/" || hash === "") {
+        setPage("landing");
+        window.scrollTo(0, 0);
+      }
+    };
+    window.addEventListener("hashchange", onRouteChange);
+    return () => window.removeEventListener("hashchange", onRouteChange);
+  }, []);
+
+  return page === "landing" ? <LandingPage match={match} /> : <MatchStudio />;
 }
 
 export default App;
