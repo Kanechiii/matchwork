@@ -12,6 +12,7 @@ from openai import OpenAIError
 from .ai_budget import foundry_budget
 from .foundry_service import explain_match_event
 from .multi_agent import orchestrate_foundry_insight
+from .observability import configure_tracing
 
 
 class MatchEvidence(BaseModel):
@@ -67,7 +68,14 @@ class InsightResponse(BaseModel):
     status: str
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    configure_tracing()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Matchwork Intelligence API",
     version="0.1.0"
 )
