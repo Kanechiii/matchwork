@@ -145,3 +145,23 @@ button, select { cursor: pointer; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* Segmented control with a shared sliding thumb (see components/Segmented.tsx). */
+.segmented { display: inline-flex; padding: 3px; gap: 2px; background: var(--sunken); border: 1px solid var(--border); border-radius: var(--radius-m); }
+.segmented button { position: relative; height: 34px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); font-size: 14px; font-weight: 600; transition: color .15s; }
+.segmented button:hover, .segmented button[aria-pressed="true"] { color: var(--text); }
+.segmented-thumb { position: absolute; inset: 0; border-radius: 6px; background: var(--surface); box-shadow: var(--shadow-1), 0 0 0 1px var(--border); }
+.segmented-label { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.segmented-label svg { width: 16px; height: 16px; }
+.segmented-sm button { height: 30px; padding: 0 10px; font-size: 13px; }
+
+/* Timeline range shared by the hero replay and the studio. Set --progress inline. */
+.timeline-range { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 22px; margin: 0; background: transparent; cursor: pointer; }
+.timeline-range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--progress), var(--sunken) var(--progress)); }
+.timeline-range::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--progress), var(--sunken) var(--progress)); }
+.timeline-range::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%; background: var(--surface); border: 2px solid var(--accent); box-shadow: var(--shadow-1); transition: transform .15s; }
+.timeline-range:active::-webkit-slider-thumb { transform: scale(1.15); }
+.timeline-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 2px solid var(--accent); }
+.timeline-range:focus-visible { outline: none; }
+.timeline-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 5px var(--accent); }
+.timeline-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 5px var(--accent); }

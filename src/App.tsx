@@ -1,5 +1,6 @@
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { ChartColumn, ChevronDown, CircleAlert, Info, Pause, Play, RefreshCw, RotateCcw, Users, X } from "lucide-react";
 import type { MatchEvent } from "./types/match";
 import { demoMatch } from "./data/demoMatch";
@@ -25,6 +26,8 @@ import { Brand } from "./components/Brand";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { Pitch } from "./components/Pitch";
 import { EventIcon } from "./components/EventIcon";
+import { Segmented } from "./components/Segmented";
+import { EASE_IN, EASE_OUT, SPRING_BAR, SPRING_UI, swap } from "./motion";
 import {
   requestMatchInsight,
   type MatchEvidence,
@@ -261,7 +264,7 @@ useEffect(() => {
   const visibleEvents = frame.recentEvents.slice().reverse();
   const onSeek = (time: number) => setReplay((current) => seekReplay(current, match, time));
 
-  // Presentation-only derivations of the values above.
+  // ---- Presentation layer. Everything above this line is the unchanged replay and insight logic. ----
   const durationSeconds = match.metadata.durationSeconds;
   const progressPct = (100 * replay.elapsedSeconds) / durationSeconds;
   const statusLabel = replay.status === "finished" ? "Full time" : isPlaying ? "Playing" : "Paused";
@@ -285,7 +288,7 @@ useEffect(() => {
   const statRows: { label: string; left: number; right: number; unit?: string }[] = [
     { label: "Shots", left: home.shots, right: away.shots },
     { label: "Shots on target", left: home.shotsOnTarget, right: away.shotsOnTarget },
-    { label: "Pass accuracy", left: home.passCompletionPct, right: away.passCompletionPct, unit: "%" },
+    { label: "Pass accuracy", left: Math.round(home.passCompletionPct), right: Math.round(away.passCompletionPct), unit: "%" },
     { label: "Tackles won", left: home.tacklesWon, right: away.tacklesWon },
     ...(isAnalyst ? [
       { label: "Pass attempts", left: home.passesAttempted, right: away.passesAttempted },
@@ -294,6 +297,51 @@ useEffect(() => {
     ] : []),
   ];
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // Timeline hover preview.
+  const [hover, setHover] = useState<{ ratio: number; time: number } | null>(null);
+  const onTimelineHover = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left - 9) / Math.max(1, rect.width - 18)));
+    setHover({ ratio, time: Math.round(ratio * durationSeconds) });
+  };
+
+  // Brief goal announcement when the score goes up (playing or seeking forward).
+  const [goalFlash, setGoalFlash] = useState<{ id: string; team: string; time: number; side: "home" | "away" } | null>(null);
+  const goalTotal = home.goals + away.goals;
+  const latestGoal = shotMarks.filter((shot) => shot.outcome === "goal").at(-1) ?? null;
+  const [goalsSeen, setGoalsSeen] = useState(goalTotal);
+  if (goalTotal !== goalsSeen) {
+    setGoalsSeen(goalTotal);
+    const side = latestGoal?.teamId === homeTeam.id ? "home" : "away";
+    setGoalFlash(goalTotal > goalsSeen && latestGoal
+      ? { id: latestGoal.id, team: side === "home" ? homeTeam.name : awayTeam.name, time: latestGoal.elapsedSeconds, side }
+      : null);
+  }
+  useEffect(() => {
+    if (!goalFlash) return;
+    const timer = window.setTimeout(() => setGoalFlash(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [goalFlash]);
+
+  // Presenter shortcuts: Space plays or pauses, arrow keys step 15 seconds.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, select, textarea, button, a, summary, [contenteditable]")) return;
+      if (event.code === "Space") {
+        event.preventDefault();
+        setReplay((current) => current.status === "playing" ? pauseReplay(current) : current.status === "finished" ? current : playReplay(current, match));
+      } else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        const step = event.key === "ArrowRight" ? 15 : -15;
+        setReplay((current) => seekReplay(current, match, Math.max(0, Math.min(match.metadata.durationSeconds, current.elapsedSeconds + step))));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div className={`studio ${isAnalyst ? "is-analyst" : "is-fan"}`}>
@@ -306,27 +354,32 @@ useEffect(() => {
             <button type="button" onClick={() => scrollTo("numbers")}>Statistics</button>
           </nav>
           <div className="studio-bar-end">
-            <span className="studio-data-note" title="All teams, players and events are fictional. No live Premier League data.">
-              <Info aria-hidden="true" /> Synthetic data
+            <span className="studio-data-note" title="All teams, players and events are fictional. No live Premier League data or personal information.">
+              <Info aria-hidden="true" /> Synthetic data only
             </span>
             <ThemeToggle />
           </div>
         </div>
+        <span className="studio-progress" style={{ transform: `scaleX(${progressPct / 100})` }} aria-hidden="true" />
       </header>
 
-      <main className="studio-main" id="match">
-        <div className="studio-head">
+      <motion.main className="studio-main" id="match" initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.08 } } }}>
+        <motion.div className="studio-head" variants={enter}>
           <div>
-            <h1>{isAnalyst ? "Analysis desk" : "Match center"}</h1>
-            <p>{isAnalyst ? "Evidence, timelines and match analysis." : "Follow the match your way."}</p>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={audience} {...swap}>
+                <h1>{isAnalyst ? "Analysis desk" : "Match center"}</h1>
+                <p>{isAnalyst ? "Evidence, timelines and match analysis." : "Follow the match your way."}</p>
+              </motion.div>
+            </AnimatePresence>
           </div>
-          <div className="segmented" role="group" aria-label="Choose viewing experience">
-            <button type="button" aria-pressed={!isAnalyst} onClick={() => setAudience("fan")}><Users aria-hidden="true" /> Fan view</button>
-            <button type="button" aria-pressed={isAnalyst} onClick={() => setAudience("analyst")}><ChartColumn aria-hidden="true" /> Analyst view</button>
-          </div>
-        </div>
+          <Segmented id="studio-view" label="Choose viewing experience" value={audience} onChange={setAudience} options={[
+            { value: "fan", label: "Fan view", icon: <Users aria-hidden="true" /> },
+            { value: "analyst", label: "Analyst view", icon: <ChartColumn aria-hidden="true" /> },
+          ]} />
+        </motion.div>
 
-        <section className="card scoreboard" aria-label="Match scoreboard and replay">
+        <motion.section className="card scoreboard" aria-label="Match scoreboard and replay" variants={enter}>
           <div className="scoreboard-top">
             <span className="scoreboard-title">{match.metadata.title}</span>
             <span className={`status-chip is-${replay.status}`}><span className="status-dot" aria-hidden="true" />{statusLabel}</span>
@@ -339,9 +392,9 @@ useEffect(() => {
             </div>
             <div className="score-center">
               <div className="score tabular" aria-label={`${homeTeam.name} ${home.goals}, ${awayTeam.name} ${away.goals}`}>
-                <span key={`home-${home.goals}`}>{home.goals}</span>
+                <span className="score-digit"><AnimatePresence mode="popLayout" initial={false}><motion.span key={home.goals} {...digit}>{home.goals}</motion.span></AnimatePresence></span>
                 <span className="score-sep" aria-hidden="true">–</span>
-                <span key={`away-${away.goals}`}>{away.goals}</span>
+                <span className="score-digit"><AnimatePresence mode="popLayout" initial={false}><motion.span key={away.goals} {...digit}>{away.goals}</motion.span></AnimatePresence></span>
               </div>
               <div className="score-clock tabular">{formatClock(replay.elapsedSeconds)} <span>/ {formatClock(durationSeconds)}</span></div>
             </div>
@@ -349,22 +402,42 @@ useEffect(() => {
               <div><h2>{awayTeam.name}</h2><small>Away</small></div>
               <span className="crest is-away" aria-hidden="true">{awayTeam.abbreviation}</span>
             </div>
+            <div className="goal-flash-slot" aria-live="polite">
+              <AnimatePresence>
+                {goalFlash && (
+                  <motion.div key={goalFlash.id} className={`goal-flash is-${goalFlash.side}`}
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 380, damping: 22 } }}
+                    exit={{ opacity: 0, y: -6, transition: { duration: 0.25, ease: EASE_IN } }}>
+                    <strong>Goal</strong> {goalFlash.team} · <span className="tabular">{formatClock(goalFlash.time)}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
-          <div className="timeline">
+          <div className="timeline" onPointerMove={onTimelineHover} onPointerLeave={() => setHover(null)}>
             <div className="timeline-marks">
               <span className="timeline-half" style={{ left: "50%" }} aria-hidden="true" />
               {shotMarks.map((shot) => {
                 const left = `${(100 * shot.elapsedSeconds) / durationSeconds}%`;
                 const team = shot.teamId === homeTeam.id ? "is-home" : "is-away";
                 return shot.outcome === "goal" ? (
-                  <button key={shot.id} type="button" className={`timeline-goal ${team}`} style={{ left }} onClick={() => onSeek(shot.elapsedSeconds)}
+                  <motion.button key={shot.id} type="button" className={`timeline-goal ${team}`} style={{ left, x: "-50%" }} onClick={() => onSeek(shot.elapsedSeconds)}
+                    initial={{ scale: 0 }} animate={{ scale: 1 }} whileHover={{ scale: 1.25 }} transition={{ type: "spring", stiffness: 500, damping: 18 }}
                     aria-label={`Goal, ${eventLabel(shot)} at ${formatClock(shot.elapsedSeconds)}. Jump to this moment`} title={`Goal, ${eventLabel(shot)} ${formatClock(shot.elapsedSeconds)}`} />
                 ) : (
-                  <span key={shot.id} className={`timeline-shot ${team}`} style={{ left }} aria-hidden="true" />
+                  <motion.span key={shot.id} className={`timeline-shot ${team}`} style={{ left, x: "-50%" }} initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.3, ease: EASE_OUT }} aria-hidden="true" />
                 );
               })}
             </div>
+            <AnimatePresence>
+              {hover && (
+                <motion.span className="timeline-tip tabular" style={{ left: `calc(9px + (100% - 18px) * ${hover.ratio})`, x: "-50%" }} aria-hidden="true"
+                  initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                  {formatClock(hover.time)}
+                </motion.span>
+              )}
+            </AnimatePresence>
             <input id="match-progress" className="timeline-range" type="range" min={0} max={durationSeconds} step={1} value={replay.elapsedSeconds}
               aria-label="Seek match replay time" aria-valuetext={formatClock(replay.elapsedSeconds)}
               style={{ "--progress": `${progressPct}%` } as CSSProperties}
@@ -374,29 +447,33 @@ useEffect(() => {
 
           <div className="controls">
             <div className="controls-main">
-              <button className="btn btn-primary play-btn" type="button" disabled={replay.status === "finished"} aria-label={isPlaying ? "Pause match replay" : "Play match replay"}
+              <motion.button className="btn btn-primary play-btn" type="button" disabled={replay.status === "finished"} aria-label={isPlaying ? "Pause match replay" : "Play match replay"}
+                whileTap={{ scale: 0.96 }}
                 onClick={() => setReplay((current) => isPlaying ? pauseReplay(current) : playReplay(current, match))}>
-                {isPlaying ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />} {isPlaying ? "Pause" : "Play"}
-              </button>
-              <button className="icon-btn icon-btn-outline" type="button" aria-label="Restart match replay" title="Restart match replay"
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span key={isPlaying ? "pause" : "play"} className="play-icon" initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.6 }} transition={{ duration: 0.15 }}>
+                    {isPlaying ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+                  </motion.span>
+                </AnimatePresence>
+                {isPlaying ? "Pause" : "Play"}
+              </motion.button>
+              <motion.button className="icon-btn icon-btn-outline" type="button" aria-label="Restart match replay" title="Restart match replay"
+                whileTap={{ rotate: -120, scale: 0.94 }} transition={SPRING_UI}
                 onClick={() => { setReplay((current) => restartReplay(current)); setDismissedEventId(null); }}>
                 <RotateCcw aria-hidden="true" />
-              </button>
-              <div className="segmented segmented-sm" role="group" aria-label="Replay speed">
-                {REPLAY_SPEEDS.map((speed) => (
-                  <button key={speed} type="button" aria-pressed={replay.speed === speed} onClick={() => setReplay((current) => setReplaySpeed(current, speed))}>{speed}×</button>
-                ))}
-              </div>
+              </motion.button>
+              <Segmented id="studio-speed" label="Replay speed" size="sm" value={replay.speed} onChange={(speed) => setReplay((current) => setReplaySpeed(current, speed))}
+                options={REPLAY_SPEEDS.map((speed) => ({ value: speed, label: `${speed}×` }))} />
             </div>
             <span className="controls-note">
-              {isPlaying ? "The story unfolds in real time." : "Drag the timeline or pick a goal marker to explore any moment."}
-              <span className="tabular"> {Math.round(progressPct)}% played</span>
+              <span>{isPlaying ? "The story unfolds in real time." : "Drag the timeline or pick a goal marker."}</span>
+              <span className="kbd-hint"><kbd>Space</kbd> play or pause · <kbd>←</kbd><kbd>→</kbd> 15s</span>
             </span>
           </div>
-        </section>
+        </motion.section>
 
         <div className="studio-grid" id="insights">
-          <div className="studio-col">
+          <motion.div className="studio-col" variants={enter}>
             <section className="card insight" aria-label="Match intelligence">
               <div className="insight-head">
                 <div>
@@ -416,7 +493,7 @@ useEffect(() => {
                 </label>
               </div>
 
-              {isAnalyst && (
+              <Collapse show={isAnalyst}>
                 <div className="model-strip">
                   <span className={`model-status is-${modelDisplayStatus}`}>
                     <span className="status-dot" aria-hidden="true" />
@@ -428,19 +505,23 @@ useEffect(() => {
                     <div><dt>Feature window</dt><dd>180s rolling</dd></div>
                   </dl>
                 </div>
-              )}
+              </Collapse>
 
-              <div className="insight-lead" key={headline}>
-                <h3>{headline}</h3>
-                <p>{narrative}</p>
+              <div className="insight-lead-slot">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div key={`${audience}:${headline}`} className="insight-lead" {...swap}>
+                    <h3>{headline}</h3>
+                    <p>{narrative}</p>
+                  </motion.div>
+                </AnimatePresence>
               </div>
 
-              <div className="insight-why">
+              <motion.div className="insight-why" layout="position">
                 <span className="label">{isAnalyst ? "Interpretation" : "Why it matters"}</span>
                 <p>{whyText}</p>
-              </div>
+              </motion.div>
 
-              {isAnalyst && (
+              <Collapse show={isAnalyst}>
                 <div className="classifier">
                   <div className="classifier-head"><span className="label">Classifier output</span><small>Not calibrated probabilities</small></div>
                   {visibleModel && prediction ? (["CONTROL", "PRESSURE", "TRANSITION"] as const).map((label, index) => {
@@ -448,15 +529,12 @@ useEffect(() => {
                     return (
                       <div className={`prob${value === topProbability ? " is-top" : ""}`} key={label}>
                         <span className="prob-label">{label.charAt(0) + label.slice(1).toLowerCase()}</span>
-                        <span className="prob-track"><span style={{ width: `${value * 100}%` }} /></span>
+                        <span className="prob-track"><motion.span initial={false} animate={{ width: `${value * 100}%` }} transition={SPRING_BAR} /></span>
                         <strong className="tabular">{(value * 100).toFixed(1)}%</strong>
                       </div>
                     );
                   }) : <p className="muted">No validated ONNX result for this replay sample.</p>}
                 </div>
-              )}
-
-              {isAnalyst && (
                 <details className="evidence" open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
                   <summary><span>Event evidence and model details</span><ChevronDown aria-hidden="true" /></summary>
                   <ul className="evidence-list">{insight.evidence.map((datum) => <li key={datum}>{datum}</li>)}</ul>
@@ -466,62 +544,71 @@ useEffect(() => {
                   </div>
                   <p className="evidence-foot">Engine: Microsoft ONNX Runtime Web (WASM) · Training: synthetic prototypes · Sample: 15s boundaries</p>
                 </details>
-              )}
-
-              {isAnalyst && modelDisplayStatus === "unavailable" && (
-                <div className="alert" role="status">
-                  <CircleAlert aria-hidden="true" />
-                  <p>ONNX unavailable: {modelError}</p>
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRetryCount((n) => n + 1)}><RefreshCw aria-hidden="true" /> Retry classifier</button>
-                </div>
-              )}
-
-              {!isAnalyst && (
-                <div className="tabs" role="group" aria-label="Story format">
-                  <button type="button" aria-pressed={insightTab === "story"} onClick={() => setInsightTab("story")}>Match story</button>
-                  <button type="button" aria-pressed={insightTab === "recap"} onClick={() => setInsightTab("recap")}>Quick recap</button>
-                </div>
-              )}
-
-              {isAnalyst || insightTab === "recap" ? (
-                <div className="narrative">
-                  <div className="narrative-head">
-                    <span className="label">{isAnalyst ? "Generated explanation" : "The story so far"}</span>
-                    {isAnalyst && <span className={`source-tag is-${visibleAiInsight?.source ?? "pending"}`}>{sourceLabel}</span>}
+                {modelDisplayStatus === "unavailable" && (
+                  <div className="alert" role="status">
+                    <CircleAlert aria-hidden="true" />
+                    <p>ONNX unavailable: {modelError}</p>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRetryCount((n) => n + 1)}><RefreshCw aria-hidden="true" /> Retry classifier</button>
                   </div>
-                  <p>{isAnalyst ? visibleAiInsight?.explanation ?? (replay.status === "playing" ? "Pause replay to request Foundry explanation." : recap) : recap}</p>
-                  {isAnalyst && <small>{visibleAiInsight?.source === "foundry" ? "Microsoft Foundry response · backed by submitted observed event IDs" : visibleAiInsight?.source === "rule-based" ? "Foundry unavailable · deterministic fallback" : "Only events up to the replay clock are used"}</small>}
-                </div>
-              ) : (
-                <div className="narrative">
-                  <div className="narrative-head"><span className="label">The moment</span></div>
-                  <p>{visibleAiInsight?.explanation ?? (latestMoment ? describeEvent(latestMoment) : "Start the replay to discover the biggest moments.")}</p>
-                  <small>{replay.status === "playing" ? "Pause on a moment for a deeper match story" : visibleAiInsight?.source === "foundry" ? "Expanded story ready" : "Showing the match story from observed events"}</small>
-                </div>
-              )}
+                )}
+              </Collapse>
+
+              <Collapse show={!isAnalyst}>
+                <Segmented id="studio-story" label="Story format" size="sm" className="insight-tabs" value={insightTab} onChange={setInsightTab} options={[
+                  { value: "story", label: "Match story" },
+                  { value: "recap", label: "Quick recap" },
+                ]} />
+              </Collapse>
+
+              <AnimatePresence mode="wait" initial={false}>
+                {isAnalyst || insightTab === "recap" ? (
+                  <motion.div key={isAnalyst ? "analyst" : "recap"} className="narrative" {...swap}>
+                    <div className="narrative-head">
+                      <span className="label">{isAnalyst ? "Generated explanation" : "The story so far"}</span>
+                      {isAnalyst && <span className={`source-tag is-${visibleAiInsight?.source ?? "pending"}`}>{sourceLabel}</span>}
+                    </div>
+                    <p>{isAnalyst ? visibleAiInsight?.explanation ?? (replay.status === "playing" ? "Pause replay to request Foundry explanation." : recap) : recap}</p>
+                    {isAnalyst && <small>{visibleAiInsight?.source === "foundry" ? "Microsoft Foundry response · backed by submitted observed event IDs" : visibleAiInsight?.source === "rule-based" ? "Foundry unavailable · deterministic fallback" : "Only events up to the replay clock are used"}</small>}
+                  </motion.div>
+                ) : (
+                  <motion.div key="story" className="narrative" {...swap}>
+                    <div className="narrative-head"><span className="label">The moment</span></div>
+                    <p>{visibleAiInsight?.explanation ?? (latestMoment ? describeEvent(latestMoment) : "Start the replay to discover the biggest moments.")}</p>
+                    <small>{replay.status === "playing" ? "Pause on a moment for a deeper match story" : visibleAiInsight?.source === "foundry" ? "Expanded story ready" : "Showing the match story from observed events"}</small>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </section>
 
-            {latestMoment && showMoment && (
-              <aside className="moment" aria-label="Latest match moment">
-                <span className={`event-icon is-${latestMoment.teamId === homeTeam.id ? "home" : "away"}`}><EventIcon type={latestMoment.type} /></span>
-                <div className="moment-copy">
-                  <small className="tabular">Latest moment · {formatClock(latestMoment.elapsedSeconds)}</small>
-                  <strong>{describeEvent(latestMoment)}</strong>
-                  <span>{eventLabel(latestMoment)} · {isAnalyst ? `Event ${latestMoment.id} · ${latestMoment.playerId}` : "Action from the pitch"}</span>
-                </div>
-                <button className="icon-btn" type="button" onClick={() => setDismissedEventId(latestMoment.id)} aria-label="Dismiss match moment"><X aria-hidden="true" /></button>
-              </aside>
-            )}
-          </div>
+            <AnimatePresence initial={false}>
+              {latestMoment && showMoment && (
+                <motion.aside className="moment" aria-label="Latest match moment"
+                  initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE_OUT } }} exit={{ opacity: 0, y: 8, transition: { duration: 0.2, ease: EASE_IN } }}>
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.span key={latestMoment.id} className={`event-icon is-${latestMoment.teamId === homeTeam.id ? "home" : "away"}`}
+                      initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} transition={{ type: "spring", stiffness: 500, damping: 26 }}>
+                      <EventIcon type={latestMoment.type} />
+                    </motion.span>
+                  </AnimatePresence>
+                  <div className="moment-copy">
+                    <small className="tabular">Latest moment · {formatClock(latestMoment.elapsedSeconds)}</small>
+                    <strong>{describeEvent(latestMoment)}</strong>
+                    <span>{eventLabel(latestMoment)} · {isAnalyst ? `Event ${latestMoment.id} · ${latestMoment.playerId}` : "Action from the pitch"}</span>
+                  </div>
+                  <button className="icon-btn" type="button" onClick={() => setDismissedEventId(latestMoment.id)} aria-label="Dismiss match moment"><X aria-hidden="true" /></button>
+                </motion.aside>
+              )}
+            </AnimatePresence>
+          </motion.div>
 
-          <div className="studio-col studio-side">
+          <motion.div className="studio-col studio-side" variants={enter}>
             <section className="card" aria-label="Observed event location on pitch">
               <div className="card-head">
                 <div><span className="eyebrow">From the pitch</span><h2>{isAnalyst ? "Observed event position" : "Where the action is"}</h2></div>
                 <div className="legend"><span><i className="legend-dot is-home" />{homeTeam.abbreviation}</span><span><i className="legend-dot is-away" />{awayTeam.abbreviation}</span></div>
               </div>
               <div className="pitch-frame">
-                <Pitch events={frame.recentEvents.slice(-5)} homeId={homeTeam.id}
+                <Pitch events={frame.recentEvents.slice(-5)} homeId={homeTeam.id} ping
                   label={latestMoment ? `Latest observed event location, ${Math.round(latestMoment.x)} percent along and ${Math.round(latestMoment.y)} percent across the pitch` : "Pitch visualization awaiting the first event"} />
               </div>
               <p className="card-foot tabular">{latestMoment ? `${formatClock(latestMoment.elapsedSeconds)} · ${describeEvent(latestMoment)}` : "Start the replay to see where recorded match events occur."}</p>
@@ -536,61 +623,95 @@ useEffect(() => {
                 <p className="empty">The opening whistle is coming. Press play to begin.</p>
               ) : (
                 <ol className="feed">
-                  {visibleEvents.map((event) => (
-                    <li key={event.id}>
-                      <span className={`event-icon is-${event.teamId === homeTeam.id ? "home" : "away"}`}><EventIcon type={event.type} /></span>
-                      <div className="feed-body">
-                        <strong>{describeEvent(event)}</strong>
-                        <small>{eventLabel(event)} · {isAnalyst ? `${event.playerId} · ${event.id}` : "Match event"}</small>
-                      </div>
-                      <time className="tabular">{formatClock(event.elapsedSeconds)}</time>
-                    </li>
-                  ))}
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {visibleEvents.map((event) => (
+                      <motion.li key={event.id} layout="position"
+                        initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                        transition={{ duration: 0.35, ease: EASE_OUT }}>
+                        <button type="button" className="feed-item" onClick={() => onSeek(event.elapsedSeconds)} title="Jump to this moment">
+                          <span className={`event-icon is-${event.teamId === homeTeam.id ? "home" : "away"}`}><EventIcon type={event.type} /></span>
+                          <span className="feed-body">
+                            <strong>{describeEvent(event)}</strong>
+                            <small>{eventLabel(event)} · {isAnalyst ? `${event.playerId} · ${event.id}` : "Match event"}</small>
+                          </span>
+                          <time className="tabular">{formatClock(event.elapsedSeconds)}</time>
+                        </button>
+                      </motion.li>
+                    ))}
+                  </AnimatePresence>
                 </ol>
               )}
             </section>
-          </div>
+          </motion.div>
         </div>
 
-        <section className="card stats" id="numbers" aria-label="Match statistics">
+        <motion.section className="card stats" id="numbers" aria-label="Match statistics" variants={enter}>
           <div className="card-head">
             <div><span className="eyebrow">Match stats</span><h2>{isAnalyst ? "Live match statistics" : "Match at a glance"}</h2></div>
             <span className="count tabular">As of {formatClock(replay.elapsedSeconds)}</span>
           </div>
           <div className="possession">
             <div className="possession-row tabular">
-              <span><i className="legend-dot is-home" />{homeTeam.abbreviation} <strong>{home.possessionPct}%</strong></span>
+              <span><i className="legend-dot is-home" />{homeTeam.abbreviation} <strong>{Math.round(home.possessionPct)}%</strong></span>
               <span className="label">Possession</span>
-              <span><strong>{away.possessionPct}%</strong> {awayTeam.abbreviation}<i className="legend-dot is-away" /></span>
+              <span><strong>{Math.round(away.possessionPct)}%</strong> {awayTeam.abbreviation}<i className="legend-dot is-away" /></span>
             </div>
             <div className="split-bar is-lg"><span className="is-home" style={{ width: `${homeShare}%` }} /><span className="is-away" /></div>
           </div>
           <div className="stat-grid">
-            {statRows.map((stat) => {
-              const total = stat.left + stat.right;
-              const share = total === 0 ? 50 : (100 * stat.left) / total;
-              return (
-                <div className="stat" key={stat.label}>
-                  <div className="stat-row tabular">
-                    <strong className={stat.left > stat.right ? "is-lead" : ""}>{stat.left}{stat.unit}</strong>
-                    <span>{stat.label}</span>
-                    <strong className={stat.right > stat.left ? "is-lead" : ""}>{stat.right}{stat.unit}</strong>
-                  </div>
-                  <div className="split-bar"><span className="is-home" style={{ width: `${share}%` }} /><span className="is-away" /></div>
-                </div>
-              );
-            })}
+            <AnimatePresence initial={false}>
+              {statRows.map((stat) => {
+                const total = stat.left + stat.right;
+                const share = total === 0 ? 50 : (100 * stat.left) / total;
+                return (
+                  <motion.div className="stat" key={stat.label} layout="position"
+                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.15 } }} transition={{ duration: 0.35, ease: EASE_OUT }}>
+                    <div className="stat-row tabular">
+                      <strong className={stat.left > stat.right ? "is-lead" : ""}>{stat.left}{stat.unit}</strong>
+                      <span>{stat.label}</span>
+                      <strong className={stat.right > stat.left ? "is-lead" : ""}>{stat.right}{stat.unit}</strong>
+                    </div>
+                    <div className="split-bar"><span className="is-home" style={{ width: `${share}%` }} /><span className="is-away" /></div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
-        </section>
+        </motion.section>
 
         <footer className="studio-footer">
           <span>Matchwork. The game, understood.</span>
-          <span>Synthetic football events and training labels. Not live Premier League data or real-world model accuracy.</span>
+          <span>Synthetic data use only. Fictional teams, players and events; no real match data or personal information. Model scores are illustrative.</span>
         </footer>
-      </main>
+      </motion.main>
     </div>
   );
 }
+
+/** Height-animated show/hide for blocks that only exist in one view. */
+function Collapse({ show, children }: { show: boolean; children: ReactNode }) {
+  return (
+    <AnimatePresence initial={false}>
+      {show && (
+        <motion.div className="mw-collapse" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+          transition={{ height: { duration: 0.4, ease: EASE_OUT }, opacity: { duration: 0.25 } }}>
+          <div className="mw-collapse-inner">{children}</div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+const enter = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE_OUT } },
+};
+
+const digit = {
+  initial: { y: "-70%", opacity: 0 },
+  animate: { y: "0%", opacity: 1, transition: { type: "spring", stiffness: 420, damping: 24 } },
+  exit: { y: "70%", opacity: 0, transition: { duration: 0.2, ease: EASE_IN } },
+} as const;
 
 function App() {
   const [page, setPage] = useState<"landing" | "studio">(
@@ -612,7 +733,15 @@ function App() {
     return () => window.removeEventListener("hashchange", onRouteChange);
   }, []);
 
-  return page === "landing" ? <LandingPage match={match} /> : <MatchStudio />;
+  return (
+    <MotionConfig reducedMotion="user">
+      <AnimatePresence mode="wait">
+        <motion.div key={page} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.35 } }} exit={{ opacity: 0, transition: { duration: 0.2 } }}>
+          {page === "landing" ? <LandingPage match={match} /> : <MatchStudio />}
+        </motion.div>
+      </AnimatePresence>
+    </MotionConfig>
+  );
 }
 
 export default App;

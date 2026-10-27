@@ -10,3 +10,9 @@
 .pitch-ring { fill: none; stroke-width: 0.5; opacity: .6; }
 .pitch-ring.is-home { stroke: var(--home); }
 .pitch-ring.is-away { stroke: var(--away); }
+.pitch-trail circle { opacity: .28; }
+.pitch-trail .is-home { fill: var(--home); }
+.pitch-trail .is-away { fill: var(--away); }
+.pitch-ping { fill: none; stroke-width: 0.6; }
+.pitch-ping.is-home { stroke: var(--home); }
+.pitch-ping.is-away { stroke: var(--away); }

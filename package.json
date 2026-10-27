@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "lucide-react": "^1.62.0",
+    "motion": "^14.7.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
@@ -24,5 +25,13 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",
     "vite": "^8.3.4"
-  }
+  },
+  "description": "**Explainable, evidence-linked football intelligence for fans and analysts.** Built for the Microsoft × Premier League *Inside the Game: Developer Hackathon 2026*.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
