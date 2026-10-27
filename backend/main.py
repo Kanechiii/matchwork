@@ -11,6 +11,7 @@ from openai import OpenAIError
 
 from .ai_budget import foundry_budget
 from .foundry_service import explain_match_event
+from .multi_agent import orchestrate_foundry_insight
 
 
 class MatchEvidence(BaseModel):
@@ -130,6 +131,22 @@ async def generate_insight(
         )
     finally:
         foundry_budget.release()
+
+
+class MultiAgentResponse(InsightResponse):
+    model_calls: int
+    trace: list[dict[str, str]]
+
+
+@app.post("/api/agents/insights", response_model=MultiAgentResponse)
+async def generate_multi_agent_insight(request: InsightRequest):
+    """Opt-in, budgeted two-specialist Foundry workflow with safe fallback."""
+    result = await orchestrate_foundry_insight(
+        request.event.model_dump(),
+        request.audience,
+        request.fallback_text,
+    )
+    return MultiAgentResponse(**result)
 
 # Serve the production React application.
 FRONTEND_DIR = (
