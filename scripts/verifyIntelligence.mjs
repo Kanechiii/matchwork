@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { demoMatch } from "../src/data/demoMatch.ts";
 import { generateSyntheticMatch } from "../src/engine/generateEvents.ts";
 import { extractWindowFeatures, FEATURE_NAMES } from "../src/ai/features.ts";
-import { buildMatchRecap } from "../src/ai/explanations.ts";
+import { buildMatchRecap, explainMatchState } from "../src/ai/explanations.ts";
+import { createPredictionRequestGate, createRetryableModelLoader } from "../src/ai/inference.ts";
 const match = generateSyntheticMatch(demoMatch);
 assert.equal(FEATURE_NAMES.length, 7);
 let prev = null;
@@ -22,4 +23,61 @@ const at60 = extractWindowFeatures(match, 60);
 const futureChanged = structuredClone(match);
 futureChanged.events = futureChanged.events.filter(e => e.elapsedSeconds <= 60);
 assert.deepEqual(extractWindowFeatures(futureChanged, 60), at60);
-console.log("MATCHWORK PHASE 3 INTELLIGENCE: PASS — leakage, normalization, evidence, recap");
+// Chronological boundaries, including each side of a 15-second inference tick.
+for (const second of [0, 1, 14, 15, 16, 2699, 2700, 2701, 5399, 5400]) {
+  const features = extractWindowFeatures(match, second);
+  const observed = match.events.filter(e => e.elapsedSeconds >= features.startSeconds && e.elapsedSeconds <= second);
+  assert.deepEqual(features.eventIds, observed.map(e => e.id));
+  assert.equal(features.eventCount, observed.length);
+  assert.equal(features.passesAttempted, observed.filter(e => e.type === "pass").length);
+  assert.equal(features.passesCompleted, observed.filter(e => e.type === "pass" && e.completed).length);
+  assert.equal(features.pressures, observed.filter(e => e.type === "pressure").length);
+  assert.equal(features.shots, observed.filter(e => e.type === "shot").length);
+  assert.equal(features.turnovers, observed.filter(e => e.type === "possession_change").length);
+  const insight = explainMatchState(features, null, "analyst", "all", match);
+  assert.ok(insight.evidenceEventIds.every(id => features.eventIds.includes(id)));
+}
+const at15 = extractWindowFeatures(match, 15);
+assert.deepEqual(extractWindowFeatures({...match, events: [...match.events].reverse()}, 15), at15);
+assert.deepEqual(extractWindowFeatures({...match, events: [...match.events, ...match.events]}, 15), at15);
+const gate = createPredictionRequestGate();
+const first = gate.next();
+const second = gate.next();
+assert.equal(gate.isCurrent(first), false);
+assert.equal(gate.isCurrent(second), true);
+gate.invalidate();
+assert.equal(gate.isCurrent(second), false);
+const stalePrediction = { label: "CONTROL", probabilities: [1, 0, 0], confidence: 1, backend: "onnxruntime-web", asOfSeconds: 15 };
+assert.equal(explainMatchState(extractWindowFeatures(match, 16), stalePrediction, "analyst", "all", match).modelBacked, false);
+assert.equal(explainMatchState(at15, stalePrediction, "analyst", "all", match).modelBacked, true);
+assert.throws(() => buildMatchRecap(match, 5401));
+
+// Simulated CDN outage: callers share one failed attempt, then a new one succeeds.
+let loadCalls = 0;
+const intermittentLoad = createRetryableModelLoader(async () => {
+  loadCalls += 1;
+  if (loadCalls === 1) throw new Error("Simulated CDN outage");
+  return "loaded";
+}, 100, "Synthetic CDN");
+const firstBatch = await Promise.allSettled([intermittentLoad(), intermittentLoad()]);
+assert.deepEqual(firstBatch.map(result => result.status), ["rejected", "rejected"]);
+assert.equal(loadCalls, 1, "Concurrent requests must share one load");
+assert.equal(await intermittentLoad(), "loaded");
+assert.equal(await intermittentLoad(), "loaded");
+assert.equal(loadCalls, 2, "Successful session must remain cached");
+
+// Simulated stalled WASM initialization: timeout must clear the stale attempt.
+let timeoutAttempts = 0;
+const stalledLoad = createRetryableModelLoader(() => {
+  timeoutAttempts += 1;
+  if (timeoutAttempts === 1) return new Promise(() => {});
+  return Promise.resolve("recovered");
+}, 20, "Synthetic WASM session");
+await assert.rejects(stalledLoad(), /timed out/);
+assert.equal(await stalledLoad(), "recovered");
+assert.equal(timeoutAttempts, 2);
+
+assert.equal(explainMatchState(at15, {
+  ...stalePrediction, asOfSeconds: 30,
+}, "analyst", "all", match).modelBacked, false, "Future predictions must be rejected");
+console.log("MATCHWORK INTELLIGENCE: PASS — boundaries, counts, evidence, seeking, as-of timestamps, timeout and failure recovery");
