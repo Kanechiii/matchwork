@@ -4,7 +4,7 @@
 
 Use this checklist for the final *Inside the Game: Developer Hackathon 2026* submission. It replaces the former GitHub Pages-centric release process; old phase records remain historical.
 
-## Submission Requirements
+See the [consolidated project roadmap](PROJECT_PHASE_ROADMAP.md) for Phase 1–10 implementation status and the optional Phase 8 multi-team scope. Do not allow unverified new scope to delay the submission gate.\n\n## Submission Requirements
 
 - [ ] Submit the project through [the official portal](https://aka.ms/insidethegame) before **October 27, 2026, 11:59 PM PDT** (October 28, 2026, 2:59 PM in the Philippines)
 - [ ] Provide a public GitHub repository and working, free-to-judge application URL

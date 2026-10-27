@@ -8,7 +8,7 @@ This index organizes current engineering guidance separately from historical pha
 
 | Document | Description |
 | --- | --- |
-| [Current Azure deployment](DEPLOYMENT_CURRENT.md) | Confirmed Container Apps, VNet, Redis, secrets and deployment checks |
+| [Consolidated project roadmap](PROJECT_PHASE_ROADMAP.md) | Historical phases 1–7, proposed multi-team Phase 8, and submission phases 9–10 |\n| [Current Azure deployment](DEPLOYMENT_CURRENT.md) | Confirmed Container Apps, VNet, Redis, secrets and deployment checks |
 | [Release checklist](RELEASE_CHECKLIST.md) | Hackathon acceptance, demo and submission gates |
 | [Documentation standards](DOCUMENTATION_STYLE.md) | Naming, consistent sections and checklist conventions |
 | [Foundry cost controls](../PHASE7_COST_GUARD.md) | Shared-attempt budgets, fail-closed limits and spending caveats |
