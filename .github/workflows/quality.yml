@@ -39,6 +39,9 @@ jobs:
       - name: Install pinned Python backend dependencies
         run: python3 -m pip install -r backend/requirements.txt
 
+      - name: Export canonical synthetic replay data
+        run: node scripts/exportReplay.mjs
+
       - name: Verify Foundry request-budget safeguards
         run: python3 -m unittest discover -s backend/tests -p 'test_*.py'
 
