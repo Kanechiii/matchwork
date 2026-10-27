@@ -1,6 +1,12 @@
 # Phase 7 — Foundry two-agent workflow (opt-in prototype)
 
-The existing `POST /api/insights` remains unchanged. A new `POST /api/agents/insights` adds two **actual model-backed roles** and a deterministic evidence auditor on the FastAPI server. No React, ONNX, GitHub Pages or collaborator-owned files are edited.
+The existing `POST /api/insights` remains unchanged. A new `POST /api/agents/insights` adds two **Agent Framework model-backed roles** and a deterministic evidence auditor on the FastAPI server. No React, ONNX, GitHub Pages or collaborator-owned files are edited.
+
+## Microsoft Agent Framework implementation
+
+`backend/agent_framework_adapter.py` creates a short-lived Microsoft `Agent` with the `OpenAIChatClient` Responses API integration for each role. Both roles use the existing Azure Foundry deployment, differentiated instructions, and separately scoped JSON handoff input. The boundary between roles stays **custom-orchestrated** so the local citation auditor can reject an unsafe Tactical Analyst response **before** any Narrative Agent call. This does not use Framework `SequentialBuilder` or hosted Foundry Agent Service.
+
+Dependency: `agent-framework-openai==1.14.3` (pinned, alongside existing FastAPI / OpenAI dependencies). Environment: `AZURE_OPENAI_BASE_URL` must be HTTPS and end in `/openai/v1` on a supported Azure hostname, with `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_DEPLOYMENT` set privately.
 
 ## Architecture and scope
 
@@ -14,7 +20,7 @@ The existing `POST /api/insights` remains unchanged. A new `POST /api/agents/ins
 
 ## Cost and deployment safety
 
-Default: `MATCHWORK_MULTI_AGENT_ENABLED=false`. This endpoint makes **zero paid Foundry calls** unless explicitly enabled. When enabled, a successful request makes **two** separately budgeted requests against the same `FoundryBudget` used by `/api/insights`. At the current default 20/hour and 50/day, at most 10 fully successful two-step workflows/hour or 25/day can occur if no single-agent requests consume allowance. These are **per-process limits, not actual Azure billing caps**; continue using Azure cost alerts and quotas. As always, never ship your Foundry API key into React bundles or log model credentials.
+Default: `MATCHWORK_MULTI_AGENT_ENABLED=false`. This endpoint makes **zero paid Foundry calls** unless explicitly enabled. No framework model calls are attempted in CI. When enabled, a successful request makes **two** separately budgeted requests against the same `FoundryBudget` used by `/api/insights`. At the current default 20/hour and 50/day, at most 10 fully successful two-step workflows/hour or 25/day can occur if no single-agent requests consume allowance. These are **per-process limits, not actual Azure billing caps**; continue using Azure cost alerts and quotas. As always, never ship your Foundry API key into React bundles or log model credentials.
 
 Example request (when a server running the branch is available):
 
@@ -45,7 +51,7 @@ npm run build
 npm run lint
 ```
 
-Mocks ensure **no Foundry costs in CI**. The tests check different roles, restricted handoffs, unsupported citations, first- and second-agent failures, retry budget accounting, and disabled mode.
+Mocks ensure **no Foundry costs in CI**. Adapter contract tests use fake Framework Agent/Client modules. The tests check different roles, restricted handoffs, unsupported citations, first- and second-agent failures, retry budget accounting, and disabled mode.
 
 ## Next acceptance gates
 
@@ -56,3 +62,20 @@ Mocks ensure **no Foundry costs in CI**. The tests check different roles, restri
 5. Integrate an accessible UI behind separate approval, while protecting Issue #3 and #4 collaboration.
 
 **Do not merge or deploy automatically.** Update Foundry/Azure deployment manually after review.
+
+## PowerShell: controlled live acceptance (review first)
+
+```powershell
+# From the cloned feature branch, in a Python virtual environment
+python -m pip install -r backend/requirements.txt
+python -m unittest discover -s backend/tests -p "test_*.py"
+# Ensure AZURE_OPENAI_BASE_URL, AZURE_OPENAI_API_KEY and
+# AZURE_OPENAI_DEPLOYMENT are set securely (not committed).
+# On local development only, after confirming your Azure credit balance:
+$env:MATCHWORK_MULTI_AGENT_ENABLED = "true"
+$env:MATCHWORK_AI_MAX_CALLS_PER_HOUR = "4"
+$env:MATCHWORK_AI_MAX_CALLS_PER_DAY = "4"
+uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+
+Send the JSON sample in this document to `http://127.0.0.1:8000/api/agents/insights` using a local REST client. Verify `source=foundry`, `model_calls=2`, the two agent entries in `trace`, distinct Fan/Analyst narratives, and in-scope event IDs. If provider options or deployment compatibility fail, record `status=agent_failed` and keep the flag disabled pending correction. **Do not expose this unauthenticated endpoint publicly.**
