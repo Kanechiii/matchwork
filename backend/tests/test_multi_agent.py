@@ -14,10 +14,15 @@ EVENT = {
 
 
 class MultiAgentTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # Isolate mocked requests from process-global Foundry budgets and
+        # developer shell variables such as MATCHWORK_AI_MAX_CALLS_PER_HOUR.
+        self.guard = FoundryBudget(hourly_limit=20, daily_limit=50)
+
     async def test_disabled_uses_no_paid_calls(self):
         async def forbidden(*args):
             self.fail("Model must not be called when disabled")
-        result = await orchestrate_foundry_insight(EVENT, "fan", "Fallback", model_call=forbidden, enabled=False)
+        result = await orchestrate_foundry_insight(EVENT, "fan", "Fallback", model_call=forbidden, budget=self.guard, enabled=False)
         self.assertEqual(result["status"], "multi_agent_disabled")
         self.assertEqual(result["model_calls"], 0)
         self.assertEqual(len(result["trace"]), 2)
@@ -50,7 +55,7 @@ class MultiAgentTests(unittest.IsolatedAsyncioTestCase):
         async def fake(role, prompt, payload):
             calls.append(role)
             return '{"finding":"fiction","evidence_ids":["future-event"]}'
-        result = await orchestrate_foundry_insight(EVENT, "fan", "Verified fallback", model_call=fake, enabled=True)
+        result = await orchestrate_foundry_insight(EVENT, "fan", "Verified fallback", model_call=fake, budget=self.guard, enabled=True)
         self.assertEqual(result["status"], "audit_rejected")
         self.assertEqual(result["source"], "rule-based")
         self.assertEqual(result["model_calls"], 1)
@@ -61,7 +66,7 @@ class MultiAgentTests(unittest.IsolatedAsyncioTestCase):
             if role == "tactical_analyst":
                 return '{"finding":"A pass", "evidence_ids":["evt-001"]}'
             return '{"explanation":"Other action","evidence_ids":["evt-002"]}'
-        result = await orchestrate_foundry_insight(EVENT, "analyst", "Safe", model_call=fake, enabled=True)
+        result = await orchestrate_foundry_insight(EVENT, "analyst", "Safe", model_call=fake, budget=self.guard, enabled=True)
         self.assertEqual(result["status"], "audit_rejected")
         self.assertEqual(result["model_calls"], 2)
 
@@ -89,7 +94,7 @@ class MultiAgentTests(unittest.IsolatedAsyncioTestCase):
     async def test_empty_evidence_does_not_call_foundry(self):
         async def forbidden(*args):
             self.fail("Must not invoke provider without evidence")
-        result = await orchestrate_foundry_insight({**EVENT, "evidence_ids": []}, "fan", "Safe", model_call=forbidden, enabled=True)
+        result = await orchestrate_foundry_insight({**EVENT, "evidence_ids": []}, "fan", "Safe", model_call=forbidden, budget=self.guard, enabled=True)
         self.assertEqual(result["status"], "insufficient_evidence")
         self.assertEqual(result["model_calls"], 0)
 
