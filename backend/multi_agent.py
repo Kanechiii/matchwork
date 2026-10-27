@@ -52,20 +52,8 @@ class AgentAuditRejected(Exception):
 
 
 async def _foundry_call(role: str, instructions: str, payload: dict[str, Any]) -> str:
-    # Lazy import keeps deterministic tests independent of external model packages.
-    from .foundry_service import get_foundry_client
-
-    deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "").strip()
-    if not deployment:
-        raise RuntimeError("Foundry deployment not configured")
-    response = await get_foundry_client().responses.create(
-        model=deployment,
-        instructions=instructions,
-        input=json.dumps(payload, ensure_ascii=False, sort_keys=True),
-        max_output_tokens=220,
-        store=False,
-    )
-    return response.output_text.strip()
+    from .agent_framework_adapter import framework_model_call
+    return await framework_model_call(role, instructions, payload)
 
 
 def _validated_output(
