@@ -39,6 +39,16 @@ jobs:
       - name: Verify Foundry request-budget safeguards
         run: python3 -m unittest discover -s backend/tests -p 'test_*.py'
 
+      - name: Install pinned Python backend dependencies
+        run: python3 -m pip install -r backend/requirements.txt
+
+      - name: Verify real Agent Framework imports and construction (offline)
+        run: |
+          AZURE_OPENAI_BASE_URL=https://demo.openai.azure.com/openai/v1/ \
+          AZURE_OPENAI_API_KEY=ci-placeholder-not-a-secret \
+          AZURE_OPENAI_DEPLOYMENT=ci-model \
+          python3 -m backend.diagnose_agents
+
       - name: Production build
         run: npm run build
 
