@@ -100,7 +100,6 @@ const visibleAiInsight =
   const [modelError, setModelError] = useState("");
   const insightWindow = Math.floor(replay.elapsedSeconds / 15);
   const modelSampleTime = insightWindow * 15;
-  const [predictionSample, setPredictionSample] = useState<number | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
@@ -110,22 +109,26 @@ const visibleAiInsight =
       .then((result) => {
         if (!current) return;
         setPrediction(result);
-        setPredictionSample(clock);
         setModelStatus("ready");
         setModelError("");
       })
       .catch((error: unknown) => {
         if (!current) return;
         setPrediction(null);
-        setPredictionSample(null);
         setModelStatus("unavailable");
         setModelError(error instanceof Error ? error.message : "Model could not be loaded");
       });
     return () => { current = false; };
   }, [insightWindow, retryCount]);
 
-  const windowFeatures = extractWindowFeatures(match, replay.elapsedSeconds);
-  const insight = explainMatchState(windowFeatures, modelStatus === "ready" && predictionSample === modelSampleTime ? prediction : null, audience, favoriteTeam, match);
+  // The sampled classifier and live replay are separate clocks. Keep event
+  // statistics/recaps live, but classify only the sampled feature window.
+  const sampleFeatures = extractWindowFeatures(match, modelSampleTime);
+  const validPrediction =
+    modelStatus === "ready" && prediction?.asOfSeconds === modelSampleTime
+      ? prediction
+      : null;
+  const insight = explainMatchState(sampleFeatures, validPrediction, audience, favoriteTeam, match);
   const recap = buildMatchRecap(match, replay.elapsedSeconds);
 
   // Advance simulated time using measured real elapsed time.
@@ -253,7 +256,7 @@ useEffect(() => {
   const isAnalyst = audience === "analyst";
   const homeTeam = match.metadata.homeTeam;
   const awayTeam = match.metadata.awayTeam;
-  const visibleModel = modelStatus === "ready" && predictionSample === modelSampleTime;
+  const visibleModel = validPrediction !== null;
   const modelDisplayStatus = visibleModel ? "ready" : modelStatus === "unavailable" ? "unavailable" : "loading";
   const latestMoment = frame.latestEvent;
   const showMoment = latestMoment && dismissedEventId !== latestMoment.id;
