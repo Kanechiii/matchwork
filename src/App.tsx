@@ -280,8 +280,8 @@ useEffect(() => {
           </a>
           <div className="mw-topnav" aria-label="Dashboard sections">
             <a href="#/">Home</a>
-            <a href="#insights">Insights</a>
-            <a href="#numbers">Statistics</a>
+            <button type="button" onClick={() => document.getElementById("insights")?.scrollIntoView({behavior:"smooth"})}>Insights</button>
+            <button type="button" onClick={() => document.getElementById("numbers")?.scrollIntoView({behavior:"smooth"})}>Statistics</button>
           </div>
           <div className="mw-nav-end"><span className="mw-live-dot" aria-hidden="true" /><span>DEMO REPLAY</span><span className="mw-top-divider" /><span className="mw-demo-tag">SYNTHETIC DATA</span></div>
         </header>
