@@ -1,7 +1,7 @@
 """Two model-backed Foundry specialists with explicit, audited handoffs.
 
-The API caller supplies synthetic evidence; this module validates cited IDs
-against THAT submitted evidence, not a trusted server-side match database.
+The orchestrator validates citations against the event passed to it. API
+routes must resolve those events from the trusted canonical replay first.
 Neither a valid citation nor an LLM output proves every prose claim is true.
 """
 from __future__ import annotations
@@ -113,7 +113,7 @@ async def orchestrate_foundry_insight(
         trace.append({"agent": agent, "status": status, "detail": detail})
 
     def fallback(status: str) -> dict[str, Any]:
-        record("evidence_auditor", "fallback", "Used caller-provided fallback text")
+        record("evidence_auditor", "fallback", "Used validated replay fallback text")
         return {
             "source": "rule-based",
             "explanation": fallback_text,
