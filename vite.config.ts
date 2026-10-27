@@ -1,10 +1,21 @@
-import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "vite";
 
-// GitHub Pages project sites are hosted under /<repository>/.
-// Explicitly select the subpath only for release builds; local development
-// and ordinary CI builds keep Vite's default root path.
 export default defineConfig({
-  plugins: [react()],
-  base: process.env.MATCHWORK_PAGES === 'true' ? '/matchwork/' : '/',
-})
+  plugins: [react(), tailwindcss()],
+
+  base:
+    process.env.MATCHWORK_PAGES === "true"
+      ? "/matchwork/"
+      : "/",
+
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true
+      }
+    }
+  }
+});

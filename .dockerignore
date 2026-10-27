@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+dist
+dist-ssr
+.env
+.env.*
+.venv
+venv
+__pycache__
+*.pyc
+*.log
+coverage
+test_foundry.py
