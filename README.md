@@ -1,144 +1,118 @@
-# Matchwork — The game, understood.
+# Matchwork — The Game, Understood
 
-**Explainable, evidence-linked football intelligence from fictional match events.** Built for the Microsoft × Premier League **Inside the Game: Developer Hackathon 2026**.
+**Explainable, evidence-linked football intelligence for fans and analysts.** Built for the Microsoft × Premier League *Inside the Game: Developer Hackathon 2026*.
 
-[**Launch the live demo**](https://matchwork-demo.lemondesert-a73cf52e.japaneast.azurecontainerapps.io/) · [**View source**](https://github.com/Kanechiii/matchwork) · [**Release checklist**](docs/RELEASE_CHECKLIST.md)
+[Live secure demo](https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/) · [Repository](https://github.com/Kanechiii/matchwork) · [Documentation](docs/README.md) · [Release checklist](docs/RELEASE_CHECKLIST.md)
 
-> **Synthetic-data demonstration.** All teams, players, match events, and replay statistics are fictional. Matchwork does **not** use live Premier League match feeds, actual match footage, or authentic player-tracking data. Its small ONNX model is trained on synthetic prototypes; its scores are not calibrated real-world probabilities.
+> **Synthetic demonstration:** All teams, players and football events are fictional. Matchwork does not ingest live Premier League data or footage. ONNX model scores are illustrative and are not calibrated predictions for real matches.
 
-## Why Matchwork?
+## Overview
 
-A scoreline tells viewers *what* happened, not *why a moment matters*. Matchwork transforms a reproducible 90-minute synthetic football event stream into time-synchronized match statistics, evidence-based explanations, and two ways to explore the game.
+Matchwork turns a seeded 90-minute fictional football match into synchronized replay, event-derived statistics, contextual intelligence and evidence-linked recaps. The experience separates accessible **Fan** explanations from more detailed **Analyst** interpretation. The app remains useful when either AI service is unavailable: rules-based insight continues and ONNX availability is disclosed.
 
-The application demonstrates five steps: **ingest** synthetic football events → **interpret** statistics and three-minute context windows → **explain** moments and their supporting event IDs → **render** replay-synchronized intelligence → **personalize** for **Fan** and **Analyst** audiences.
+## Try the Demo
 
-## Try the demo
+1. Open the [secure application](https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/). Allow for a cold start after inactivity.
+2. Play, pause, restart or seek the fictional match. Inspect synchronized score, event feed and statistics.
+3. Explore Fan and Analyst explanations and inspect cited event identifiers.
+4. Observe replay-linked recaps, and distinguish model-backed content from deterministic fallback when the UI exposes its source.
 
-Open the [public Matchwork dashboard](https://matchwork-demo.lemondesert-a73cf52e.japaneast.azurecontainerapps.io/) in a desktop or mobile browser. No account or payment is required.
-
-1. **Explore the match.** Play, pause, restart, or seek through the 90-minute fictional fixture. Change playback speed between **1×, 4×, and 16×**.
-2. **Inspect event-grounded insight.** Watch the score, events, replay statistics, and rolling three-minute intelligence update with the replay clock.
-3. **Compare audiences.** Toggle **Fan** for an accessible explanation and **Analyst** for additional tactical context and model-score caveats; use team focus where shown.
-4. **See two AI paths.** The browser runs an illustrative **ONNX Runtime Web** classifier for control, pressure, and transition patterns. When the replay is paused or finishes, the backend can request a short explanation from **Microsoft Foundry**, grounded in the supplied synthetic evidence.
-5. **Observe transparent fallback.** If Foundry is disabled, unavailable, or rate-protected, the API returns a **rule-based** explanation and an explicit status. If ONNX resources cannot load, the interface reports that inference is unavailable rather than inventing a prediction.
-
-The demo may take longer to respond on the first request after inactivity because Azure Container Apps is configured to scale to zero.
-
-**Judging/test access:** [Live application](https://matchwork-demo.lemondesert-a73cf52e.japaneast.azurecontainerapps.io/) · [Health endpoint](https://matchwork-demo.lemondesert-a73cf52e.japaneast.azurecontainerapps.io/health). The public demonstration is provided without login credentials. The backend may serve rule-based explanations when the Foundry request allowance is exhausted.
+**Access boundary:** Public viewing does not imply unauthenticated access to paid model endpoints. Both `POST /api/insights` and `POST /api/agents/insights` require server-side bearer authorization. Never publish the token or embed it in browser JavaScript. The opt-in browser operator session is not a public sign-in system. A visible recap alone does not establish that a Foundry model request ran.
 
 ## Architecture
 
 ```text
-Fictional teams and reproducible synthetic event generator
-       │
-       ▼
-React + TypeScript + Vite web dashboard
-       ├── Timeline replay, score, events, statistics
-       ├── Three-minute features + source event IDs
-       ├── ONNX Runtime Web (browser/WASM, synthetic-trained classifier)
-       ├── Deterministic insights and rolling match recap
-       └── Fan / Analyst presentation
-                    │
-           Pause or finished replay
-                    ▼
-         POST /api/insights (same origin)
-                    │
-       Python FastAPI on Azure Container Apps
-          ├── Input validation and request safeguards
-          ├── Microsoft Foundry model endpoint
-          └── Rule-based fallback with explicit status
+Seeded fictional match + replay event generator
+                   │
+                   ▼
+React + TypeScript + Vite dashboard
+ ├─ Replay, scoring, match statistics, evidence feed
+ ├─ ONNX Runtime Web (synthetic-trained WASM classifier)
+ └─ Rule-based fallback and Fan / Analyst explanations
+                   │
+           Protected API boundary
+                   ▼
+FastAPI in Azure Container Apps (Japan East)
+ ├─ Trusted evidence ledger (exported from seeded replay)
+ ├─ Bearer-token protected single-agent and specialist endpoints
+ ├─ Microsoft Foundry model inference (opt-in specialist path)
+ ├─ Atomic Redis shared attempt budget (enabled on secure demo)
+ └─ Explicit AI-unavailable and budget-limited fallback
 
-GitHub Actions → checks + manually published GHCR container image
-GHCR image → Azure Container Apps (Japan East; HTTPS)
+GitHub Actions → GHCR image → Azure Container Apps
+                            ↕ private VNet / TLS
+                         Azure Managed Redis
 ```
 
-- **Frontend:** React 19, TypeScript, Vite 8, CSS, replay/statistics engines.
-- **Browser inference:** Microsoft ONNX Runtime Web WASM, version-pinned CDN assets, small embedded synthetic-prototype classifier.
-- **Server inference:** Python 3.12, FastAPI, Microsoft Foundry via the OpenAI-compatible Responses API; API key supplied only as a server-side Container Apps secret.
-- **Hosting:** Azure Container Apps Consumption in Japan East, container image published by GitHub Actions to GitHub Container Registry (GHCR).
-- **Validation:** GitHub Actions checks TypeScript build, lint, event/statistics/replay consistency, synthetic model reproducibility, ONNX inference, and request-budget tests.
+The backend verifies `match_id`, `as_of_seconds`, `evidence_ids` and `audience` against a canonical server-side replay ledger. It does **not** accept caller-authored `fallback_text` or arbitrary match descriptions. The multi-agent path includes model-backed specialist roles, bounded handoff and evidence auditing; **its existence in the repository is not proof that the public UI invokes it**.
 
-The experimental [four-stage specialist workflow prototype](docs/WORKFLOW_PROTOTYPE.md) is tested separately. **It is not deployed as a multi-agent LLM application.** Do not confuse this prototype with the live Foundry explanation endpoint.
+## Technology
 
-## Local development
+| Layer | Implementation |
+| --- | --- |
+| Frontend | React, TypeScript, Vite, CSS |
+| Replay and analysis | Deterministic seeded events, rolling context, event-derived statistics |
+| Browser ML | Microsoft ONNX Runtime Web / WASM with synthetic prototypes |
+| Backend | Python 3.12, FastAPI, trusted evidence validation |
+| Generative AI | Microsoft Foundry; Agent Framework-backed specialist workflow is opt-in |
+| Hosting | Azure Container Apps, GHCR, GitHub Actions |
+| Cost safeguards | Azure Managed Redis atomic shared AI-attempt ledger, per-process concurrency, quotas and budget alerts |
 
-**Prerequisites:** Node.js 24, npm, Python 3.12+ (for the API).
+## Local Development
 
-```bash
+Requires Node.js 24, npm and Python 3.12+.
+
+```powershell
 git clone https://github.com/Kanechiii/matchwork.git
 cd matchwork
 npm ci
 npm run dev
 ```
 
-Vite displays the local frontend address (typically `http://localhost:5173`). Frontend replay, synthetic match statistics, and browser ONNX inference are usable without Foundry credentials. API calls through `/api/insights` need the optional FastAPI server; without it, the frontend uses its local rule-based fallback.
+For the backend, in another terminal:
 
-To run the optional backend in a **separate terminal**, install its Python dependencies and create a local `.env` file in the repository root:
-
-```bash
+```powershell
 python -m pip install -r backend/requirements.txt
-```
-
-```dotenv
-AZURE_OPENAI_BASE_URL=https://YOUR-FOUNDRY-ENDPOINT/openai/v1/
-AZURE_OPENAI_DEPLOYMENT=YOUR-MODEL-DEPLOYMENT
-AZURE_OPENAI_API_KEY=YOUR-SECRET-KEY
-MATCHWORK_AI_ENABLED=false
-MATCHWORK_AI_MAX_CALLS_PER_HOUR=20
-MATCHWORK_AI_MAX_CALLS_PER_DAY=50
-```
-
-Then start the backend:
-
-```bash
+node scripts/exportReplay.mjs
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-Vite proxies `/api` requests to port 8000. Leave `MATCHWORK_AI_ENABLED=false` for zero paid Foundry attempts; explicitly switch to `true` only with valid Foundry configuration and authorization to incur API charges. **Never commit `.env` or credentials.**
+The browser replay and rule-based recap work without paid AI credentials. Paid endpoints require an appropriately configured server-side access token, trusted evidence payload, Foundry endpoint and an available shared attempt ledger. Keep `MATCHWORK_AI_ENABLED=false` until those safeguards are configured. See [API security](docs/PHASE7B_API_SECURITY.md) and [Foundry workflow](docs/FOUNDRY_MULTI_AGENT.md). Do not commit credentials or `.env` files.
 
-## Build and verification
+## Verification
 
-```bash
+```powershell
 npm ci
+node scripts/exportReplay.mjs
 npm run build
 npm run lint
-node scripts/verifyGenerator.mjs
-node scripts/verifyStats.mjs
-node scripts/verifyReplay.mjs
-node scripts/verifyIntegration.mjs
-node scripts/verifyIntelligence.mjs
-node scripts/verifyEnterprise.mjs
-node scripts/verifyWorkflow.mjs
 python -m unittest discover -s backend/tests -p 'test_*.py'
+python -m backend.evaluate_agents
 ```
 
-CI additionally tests actual ONNX Runtime Web WASM inference and reproducible model training. See [quality workflow](.github/workflows/quality.yml) for the complete commands and CI-only dependencies.
+Additional reproducibility, replay, ONNX, enterprise and workflow checks run in [GitHub Actions](.github/workflows/quality.yml).
 
-## Foundry usage and cost protection
+## Security, Cost and Limitations
 
-`POST /api/insights` accepts an audience (`fan` or `analyst`), validated match evidence, and a `fallback_text`. Replies identify their origin (`foundry` or `rule-based`), explanation, evidence IDs, and a status such as `success`, `ai_disabled`, `ai_unavailable`, `ai_busy`, `ai_hourly_limited`, or `ai_daily_limited`.
+- The canonical synthetic ledger and event IDs support auditing but do not establish factual correctness of generated narratives.
+- The ONNX classifier is trained on synthetic prototypes, not a real-world validated football dataset.
+- The API bearer token remains server-side; the optional operator cookie/session is not production identity management.
+- The secure Azure demo uses a private-endpoint Redis instance and an atomic hourly/daily reservation script for **shared AI attempt limits**. A reservation test succeeded; this is **not** a hard spending cap, user quota or durable audit trail.
+- Azure budgets notify; they do not automatically shut off billable inference. Redis loss or alternate Foundry clients may bypass attempts recorded by this application.
+- A rule-based recap should not be represented as proof of live Foundry inference. Model-backed specialist deployment requires its own verification.
+- No official football broadcast media or live Premier League feeds are bundled.
 
-The demo deployment uses a **10,000 tokens/minute** Foundry allocation and attempts to limit model calls to **20 per hour** and **50 per UTC day**. These counters are **per Python process and reset on process restart or new instance**; they do not guarantee a hard monetary cap. Azure Cost Management budget alerts are configured separately and **do not automatically stop spending**. Details: [Phase 7 cost guard](PHASE7_COST_GUARD.md).
+See [deployment evidence](docs/DEPLOYMENT_CURRENT.md), [cost controls](PHASE7_COST_GUARD.md), and [documentation index](docs/README.md).
 
-Production deployment uses prebuilt images from GHCR. The student subscription did not permit ACR Tasks, so `az acr build` and `az containerapp up --source .` are not the release path.
+## Submission Readiness
 
-## Data provenance, security, and limitations
+- [x] Repository with documented synthetic-data limitations
+- [x] Publicly reachable secure Azure Container Apps demo and replay/recap smoke test
+- [x] Redis-backed shared attempt reservation tested in the secure environment
+- [ ] Verify model-backed Foundry output separately from rules-based fallback for judging
+- [ ] Check desktop/mobile presentation, screenshots and incognito access
+- [ ] Publish a demo video **under two minutes**
+- [ ] Confirm contributor permissions and license decision
+- [ ] Complete submission at [Inside the Game](https://aka.ms/insidethegame)
 
-- **Fictional data only:** The generator creates a repeatable 90-minute match, usually configured for approximately 900–1,400 events. Possession and pressure are estimates computed from synthetic events, not live sensors.
-- **Explainability:** Structured evidence IDs are retained with request/response data. This supports traceability, but **an ID alone does not prove every generated statement is correct**.
-- **Model honesty:** The ONNX classifier is an illustrative logistic model trained on handcrafted synthetic-state prototypes. It has not been validated against real matches; its output scores are not calibrated probabilities.
-- **AI resilience:** Browser ONNX inference depends on external CDN resources. Microsoft Foundry requires network access and a configured backend deployment. Fallback behavior is explicit when either path is unavailable.
-- **Cost and abuse:** The public inference endpoint has basic request-size, attempt-rate, and concurrency safeguards, but **no user authentication or durable, globally enforced cost ledger**. This is a hackathon prototype, not an enterprise SLA.
-- **Rights:** The project intentionally does not redistribute Premier League match footage, match data, third-party music, or unlicensed broadcast material.
-
-For additional boundaries and prototype-only architecture, see [enterprise readiness notes](docs/ENTERPRISE_READINESS.md) and [workflow prototype](docs/WORKFLOW_PROTOTYPE.md). Some historical phase documents predate the production Azure/Foundry deployment.
-
-## Hackathon submission
-
-- **Official project portal:** https://aka.ms/insidethegame
-- **Public app:** https://matchwork-demo.lemondesert-a73cf52e.japaneast.azurecontainerapps.io/
-- **Public code:** https://github.com/Kanechiii/matchwork
-- **Demo video:** To be recorded and published separately; a public URL is required for the official submission.
-- **Project category:** Select the award category that accurately matches the live implementation; Matchwork demonstrates Microsoft Foundry integration and Azure cloud-native hosting.
-
-**Maintainers and contributors:** Review license and contributor permissions before publishing an open-source license. No license is granted merely by making a repository public.
+**Deadline:** October 27, 2026, 11:59 PM Pacific time (October 28, 2026, 2:59 PM Philippines). Detailed acceptance steps: [release checklist](docs/RELEASE_CHECKLIST.md).
