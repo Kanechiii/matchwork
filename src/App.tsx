@@ -18,6 +18,7 @@ import { predictMatchState, type MatchPrediction } from "./ai/inference";
 import { explainMatchState, buildMatchRecap, type AudienceMode } from "./ai/explanations";
 import type { TeamId } from "./types/match";
 import "./App.css";
+import LandingPage from "./LandingPage";
 import {
   requestMatchInsight,
   type MatchEvidence,
@@ -63,6 +64,17 @@ function describeEvent(event: MatchEvent): string {
 }
 
 function App() {
+  const [page, setPage] = useState<"landing" | "studio">(
+    () => window.location.hash.startsWith("#/studio") ? "studio" : "landing",
+  );
+  useEffect(() => {
+    const onRouteChange = () => {
+      setPage(window.location.hash.startsWith("#/studio") ? "studio" : "landing");
+      window.scrollTo({ top: 0, behavior: "instant" });
+    };
+    window.addEventListener("hashchange", onRouteChange);
+    return () => window.removeEventListener("hashchange", onRouteChange);
+  }, []);
   const [replay, setReplay] = useState(() =>
     createReplayState(match),
   );
@@ -254,30 +266,32 @@ useEffect(() => {
   const visibleEvents = frame.recentEvents.slice().reverse();
   const onSeek = (time: number) => setReplay((current) => seekReplay(current, match, time));
 
+  if (page === "landing") return <LandingPage match={match} />;
+
   return (
     <main className={`mw-app ${isAnalyst ? "mw-analyst" : "mw-fan"}`}>
       <div className="mw-ambient mw-ambient-one" aria-hidden="true" />
       <div className="mw-ambient mw-ambient-two" aria-hidden="true" />
       <div className="mw-shell">
         <header className="mw-topbar">
-          <a className="mw-brand" href="#match" aria-label="Matchwork, back to match overview">
+          <a className="mw-brand" href="#/" aria-label="Matchwork, back to home">
             <span className="mw-brand-icon" aria-hidden="true"><span /></span>
             <span className="mw-brand-word">MATCHWORK<span className="mw-brand-period">.</span></span>
           </a>
           <div className="mw-topnav" aria-label="Dashboard sections">
-            <a href="#match">Match center</a>
+            <a href="#/">Home</a>
             <a href="#insights">Insights</a>
             <a href="#numbers">Statistics</a>
           </div>
-          <div className="mw-nav-end"><span className="mw-live-dot" aria-hidden="true" /><span>SIMULATED LIVE</span><span className="mw-top-divider" /><span className="mw-demo-tag">SYNTHETIC DATA</span></div>
+          <div className="mw-nav-end"><span className="mw-live-dot" aria-hidden="true" /><span>DEMO REPLAY</span><span className="mw-top-divider" /><span className="mw-demo-tag">SYNTHETIC DATA</span></div>
         </header>
 
         <div className="mw-content" id="match">
           <div className="mw-pagehead mw-reveal">
             <div>
-              <div className="mw-kicker"><span className="mw-accent-line" /> MATCH INTELLIGENCE / 2026 DEMO</div>
-              <h1>Your front-row seat <em>to the game.</em></h1>
-              <p>{isAnalyst ? "Replay-synchronized event intelligence, evidence and model diagnostics." : "Every moment tells a story. Follow the action as it unfolds."}</p>
+              
+              <h1>{isAnalyst ? "Analysis desk" : "Match center"}</h1>
+              <p>{isAnalyst ? "Evidence, timelines and match analysis." : "Follow the match your way."}</p>
             </div>
             <div className="mw-mode-switch" role="group" aria-label="Choose viewing experience">
               <button type="button" className={!isAnalyst ? "mw-mode-active" : ""} aria-pressed={!isAnalyst} onClick={() => setAudience("fan")}><span aria-hidden="true">◉</span> Fan view</button>
@@ -292,7 +306,7 @@ useEffect(() => {
             </div>
             <div className="mw-scoreboard">
               <div className="mw-team mw-team-home"><div className="mw-crest mw-crest-home"><span>{homeTeam.abbreviation.slice(0,1)}</span></div><span className="mw-team-abbr">{homeTeam.abbreviation}</span><h2>{homeTeam.name}</h2><small>HOME</small></div>
-              <div className="mw-score-center"><div className="mw-score" aria-label={`${homeTeam.name} ${home.goals}, ${awayTeam.name} ${away.goals}`}><span key={home.goals}>{home.goals}</span><b>:</b><span key={away.goals}>{away.goals}</span></div><div className="mw-score-time"><span className="mw-clock-dot" aria-hidden="true" /> {formatClock(replay.elapsedSeconds)} <span>/ {formatClock(match.metadata.durationSeconds)}</span></div><span className="mw-match-round">FRIENDLY / SIMULATED MATCH</span></div>
+              <div className="mw-score-center"><div className="mw-score" aria-label={`${homeTeam.name} ${home.goals}, ${awayTeam.name} ${away.goals}`}><span key={home.goals}>{home.goals}</span><b>:</b><span key={away.goals}>{away.goals}</span></div><div className="mw-score-time"><span className="mw-clock-dot" aria-hidden="true" /> {formatClock(replay.elapsedSeconds)} <span>/ {formatClock(match.metadata.durationSeconds)}</span></div><span className="mw-match-round">DEMO MATCH</span></div>
               <div className="mw-team mw-team-away"><div className="mw-crest mw-crest-away"><span>{awayTeam.abbreviation.slice(0,1)}</span></div><span className="mw-team-abbr">{awayTeam.abbreviation}</span><h2>{awayTeam.name}</h2><small>AWAY</small></div>
             </div>
 
@@ -333,7 +347,7 @@ useEffect(() => {
                   {modelDisplayStatus === "unavailable" && <div className="mw-technical-error"><p>ONNX unavailable: {modelError}</p><button type="button" onClick={()=>setRetryCount((n)=>n+1)}>Retry classifier ↻</button></div>}
                 </>}
                 {!isAnalyst && <div className="mw-story-actions"><button type="button" className={insightTab==="story"?"mw-tab-selected":""} onClick={()=>setInsightTab("story")} aria-pressed={insightTab==="story"}>Match story</button><button type="button" className={insightTab==="recap"?"mw-tab-selected":""} onClick={()=>setInsightTab("recap")} aria-pressed={insightTab==="recap"}>Quick recap</button></div>}
-                {isAnalyst || insightTab==="recap" ? <div className="mw-narrative-box"><div><strong>{isAnalyst ? "GENERATED EXPLANATION" : "THE STORY SO FAR"}</strong>{isAnalyst && <span className="mw-source-pill">{visibleAiInsight?.source==="foundry"?"FOUNDRY": "RULE BASED"}</span>}</div><p>{isAnalyst ? visibleAiInsight?.explanation ?? (replay.status==="playing"?"Pause replay to request Foundry explanation.":recap) : recap}</p>{isAnalyst && <small>{visibleAiInsight?.source==="foundry"?"Microsoft Foundry response · backed by submitted observed event IDs":visibleAiInsight?.source==="rule-based"?"Foundry unavailable · deterministic fallback":"Only events up to the replay clock are used"}</small>}</div> : <div className="mw-narrative-box"><strong>YOUR MATCH, EXPLAINED</strong><p>{visibleAiInsight?.explanation ?? (latestMoment ? describeEvent(latestMoment) : "Start the replay to discover the biggest moments.")}</p><small>{replay.status==="playing"?"Pause on a moment for a deeper match story":visibleAiInsight?.source==="foundry"?"Expanded story ready":"Showing the match story from observed events"}</small></div>}
+                {isAnalyst || insightTab==="recap" ? <div className="mw-narrative-box"><div><strong>{isAnalyst ? "GENERATED EXPLANATION" : "THE STORY SO FAR"}</strong>{isAnalyst && <span className="mw-source-pill">{visibleAiInsight?.source==="foundry"?"FOUNDRY": "RULE BASED"}</span>}</div><p>{isAnalyst ? visibleAiInsight?.explanation ?? (replay.status==="playing"?"Pause replay to request Foundry explanation.":recap) : recap}</p>{isAnalyst && <small>{visibleAiInsight?.source==="foundry"?"Microsoft Foundry response · backed by submitted observed event IDs":visibleAiInsight?.source==="rule-based"?"Foundry unavailable · deterministic fallback":"Only events up to the replay clock are used"}</small>}</div> : <div className="mw-narrative-box"><strong>THE MOMENT</strong><p>{visibleAiInsight?.explanation ?? (latestMoment ? describeEvent(latestMoment) : "Start the replay to discover the biggest moments.")}</p><small>{replay.status==="playing"?"Pause on a moment for a deeper match story":visibleAiInsight?.source==="foundry"?"Expanded story ready":"Showing the match story from observed events"}</small></div>}
               </section>
 
               {latestMoment && showMoment && <aside className="mw-moment-banner mw-reveal" aria-label="Latest match moment"><div className="mw-moment-mark" aria-hidden="true">↗</div><div className="mw-moment-copy"><small>LATEST MATCH MOMENT · {formatClock(latestMoment.elapsedSeconds)}</small><strong>{describeEvent(latestMoment)}</strong><span>{eventLabel(latestMoment)} / {isAnalyst ? `Event ${latestMoment.id} / ${latestMoment.playerId}` : "Action from the pitch"}</span></div><button className="mw-moment-dismiss" type="button" onClick={()=>setDismissedEventId(latestMoment.id)} aria-label="Dismiss match moment">×</button></aside>}
@@ -354,7 +368,7 @@ useEffect(() => {
             </div>
           </div>
 
-          <section className="mw-panel mw-stats-panel mw-reveal" id="numbers" aria-label="Match statistics"><div className="mw-panel-heading"><div><span className="mw-panel-kicker">THE NUMBERS BEHIND THE GAME</span><h2>{isAnalyst?"Live match statistics":"Match at a glance"}</h2></div><span className="mw-section-time">AS OF {formatClock(replay.elapsedSeconds)}</span></div>
+          <section className="mw-panel mw-stats-panel mw-reveal" id="numbers" aria-label="Match statistics"><div className="mw-panel-heading"><div><span className="mw-panel-kicker">MATCH STATS</span><h2>{isAnalyst?"Live match statistics":"Match at a glance"}</h2></div><span className="mw-section-time">{formatClock(replay.elapsedSeconds)}</span></div>
             <div className="mw-possession"><div className="mw-possession-heading"><span><i className="mw-legend-dot mw-legend-home" />{homeTeam.abbreviation} <strong>{home.possessionPct}%</strong></span><span>POSSESSION</span><span><strong>{away.possessionPct}%</strong> {awayTeam.abbreviation}<i className="mw-legend-dot mw-legend-away" /></span></div><div className="mw-possession-track"><span style={{width:`${homeShare}%`}} /></div></div>
             <div className="mw-stat-grid">{([{label:"Shots",left:home.shots,right:away.shots},{label:"Shots on target",left:home.shotsOnTarget,right:away.shotsOnTarget},{label:"Pass accuracy",left:`${home.passCompletionPct}%`,right:`${away.passCompletionPct}%`},{label:"Tackles won",left:home.tacklesWon,right:away.tacklesWon},...(isAnalyst?[{label:"Pass attempts",left:home.passesAttempted,right:away.passesAttempted},{label:"Completed passes",left:home.passesCompleted,right:away.passesCompleted},{label:"Defensive pressures",left:home.pressuresApplied,right:away.pressuresApplied}]:[])]).map((stat)=><div className="mw-stat" key={stat.label}><strong>{stat.left}</strong><span>{stat.label}</span><strong>{stat.right}</strong></div>)}</div>
           </section>
