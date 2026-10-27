@@ -49,23 +49,32 @@ class SharedAttemptLedger:
         except Exception:
             return "ai_budget_unavailable"
 
-
 def from_environment() -> SharedAttemptLedger | None:
-    if os.getenv("MATCHWORK_SHARED_BUDGET_ENABLED", "false").lower() not in ("1", "true"):
+    if os.getenv(
+        "MATCHWORK_SHARED_BUDGET_ENABLED", "false"
+    ).lower() not in ("1", "true"):
         return None
+
     url = os.getenv("MATCHWORK_REDIS_URL", "")
-    # Never accept unencrypted Redis credentials over the network.
+
     if not url.startswith("rediss://"):
         return SharedAttemptLedgerUnavailable()
+
     try:
-        import redis
-        return SharedAttemptLedger(redis.from_url(
-            url, socket_connect_timeout=2, socket_timeout=2,
+        from redis.cluster import RedisCluster
+
+        client = RedisCluster.from_url(
+            url,
+            socket_connect_timeout=2,
+            socket_timeout=2,
             health_check_interval=30,
-        ))
+            ssl_check_hostname=True,
+        )
+
+        return SharedAttemptLedger(client)
+
     except Exception:
         return SharedAttemptLedgerUnavailable()
-
 
 class SharedAttemptLedgerUnavailable:
     def reserve(self, hourly_limit: int, daily_limit: int) -> str:
