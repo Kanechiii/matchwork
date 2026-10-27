@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from typing import Any, Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 from openai import OpenAIError
@@ -13,6 +13,8 @@ from .ai_budget import foundry_budget
 from .foundry_service import explain_match_event
 from .multi_agent import orchestrate_foundry_insight
 from .observability import configure_tracing
+from .auth import require_ai_access
+from .trusted_evidence import resolve_evidence, MATCH_ID
 
 
 class MatchEvidence(BaseModel):
@@ -61,6 +63,23 @@ class InsightRequest(BaseModel):
     )
 
 
+class TrustedInsightRequest(BaseModel):
+    match_id: Literal["matchwork-curated-security-fixture-v1"]
+    as_of_seconds: int = Field(ge=0, le=5400)
+    evidence_ids: list[str] = Field(min_length=1, max_length=10)
+    audience: Literal["fan", "analyst"] = "fan"
+
+
+def verified_request(request: TrustedInsightRequest) -> tuple[dict[str, Any], str]:
+    evidence = resolve_evidence(
+        request.match_id, request.as_of_seconds, request.evidence_ids
+    )
+    fallback = (
+        "Observed synthetic fixture: " + evidence["description"] + "."
+    )
+    return evidence, fallback
+
+
 class InsightResponse(BaseModel):
     source: Literal["foundry", "rule-based"]
     explanation: str
@@ -103,23 +122,25 @@ async def health():
 
 @app.post(
     "/api/insights",
-    response_model=InsightResponse
+    response_model=InsightResponse,
+    dependencies=[Depends(require_ai_access)],
 )
 async def generate_insight(
-    request: InsightRequest
+    request: TrustedInsightRequest
 ):
+    evidence, fallback = verified_request(request)
     fallback_status = foundry_budget.acquire()
     if fallback_status is not None:
         return InsightResponse(
             source="rule-based",
-            explanation=request.fallback_text,
-            evidence_ids=request.event.evidence_ids,
+            explanation=fallback,
+            evidence_ids=evidence["evidence_ids"],
             status=fallback_status
         )
 
     try:
         explanation = await explain_match_event(
-            request.event.model_dump(),
+            evidence,
             request.audience
         )
 
@@ -146,13 +167,14 @@ class MultiAgentResponse(InsightResponse):
     trace: list[dict[str, str]]
 
 
-@app.post("/api/agents/insights", response_model=MultiAgentResponse)
-async def generate_multi_agent_insight(request: InsightRequest):
+@app.post("/api/agents/insights", response_model=MultiAgentResponse, dependencies=[Depends(require_ai_access)])
+async def generate_multi_agent_insight(request: TrustedInsightRequest):
+    evidence, fallback = verified_request(request)
     """Opt-in, budgeted two-specialist Foundry workflow with safe fallback."""
     result = await orchestrate_foundry_insight(
-        request.event.model_dump(),
+        evidence,
         request.audience,
-        request.fallback_text,
+        fallback,
     )
     return MultiAgentResponse(**result)
 
