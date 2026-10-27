@@ -42,6 +42,19 @@ class AuthEvidenceTests(unittest.TestCase):
                 with patch("backend.main.foundry_budget.acquire", return_value="ai_disabled"):
                     self.assertEqual(self.request(path, token=TOKEN).status_code, 200)
 
+    def test_single_agent_provider_failure_returns_verified_fallback(self):
+        async def offline_failure(*args, **kwargs):
+            raise RuntimeError("simulated provider failure")
+
+        with patch("backend.main.foundry_budget.acquire", return_value=None), \
+             patch("backend.main.foundry_budget.release"), \
+             patch("backend.main.explain_match_event", side_effect=offline_failure):
+            result = self.request("/api/insights", token=TOKEN)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.json()["status"], "ai_unavailable")
+        self.assertEqual(result.json()["evidence_ids"], ["evt-0001", "evt-0002"])
+        self.assertIn("Observed synthetic replay", result.json()["explanation"])
+
     def test_missing_config_fails_closed(self):
         with patch.dict(os.environ, {"MATCHWORK_API_ACCESS_TOKEN": ""}):
             self.assertEqual(self.request("/api/agents/insights", token=TOKEN).status_code, 503)
