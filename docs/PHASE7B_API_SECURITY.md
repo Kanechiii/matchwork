@@ -7,6 +7,8 @@ reservation or Foundry calls. `GET /health` remains public.
 
 ## Local setup
 
+Run `node scripts/exportReplay.mjs` from the repository root before starting FastAPI. This exports the seeded 1,200-event authoritative ledger from the same TypeScript generator used by the UI. CI and Docker perform this automatically. Any generator changes require regeneration.
+
 Use a random access token of at least 32 bytes. Do **not** place the token in
 React, Vite public environment variables, frontend source, Pages artifacts,
 screenshots, or the GitHub repo. Browser code cannot securely hold a shared
@@ -27,9 +29,9 @@ set it there separately; never paste it into public UI):
 ```powershell
 $headers = @{ Authorization = "Bearer $env:MATCHWORK_API_ACCESS_TOKEN" }
 $body = @{
-  match_id = "matchwork-curated-security-fixture-v1"
-  as_of_seconds = 4680
-  evidence_ids = @("safe-pass-001", "safe-shot-001")
+  match_id = "matchwork-demo-001"
+  as_of_seconds = 30
+  evidence_ids = @("evt-0001", "evt-0002")
   audience = "analyst"
 } | ConvertTo-Json
 
@@ -39,19 +41,15 @@ Invoke-RestMethod -Uri http://127.0.0.1:8001/api/agents/insights `
 
 The new API **does not accept** the earlier `event` / `fallback_text`
 payload. The backend selects canonical evidence and builds its own
-rule-based fallback. An authenticated request with fabricated `evt-0001`,
+rule-based fallback. An authenticated request with fabricated `evt-9999`,
 a future timestamp, or an unknown match receives HTTP 422 before any
 model invocation. Both paid endpoints require the same request format.
 
 ## Evidence boundary
 
-`backend/trusted_evidence.py` contains a **small curated server-controlled
-synthetic fixture**, with `safe-shot-001`, `safe-pass-001`, and
-`safe-pressure-001`. It is **not the seeded JavaScript replay dataset**.
-This is a backend protection prototype and cannot yet drive verified
-replay-clock insights for arbitrary UI events. Full canonical evidence
-integration requires generating/exporting the real synthetic event stream
-and verifying its consistency; avoid claiming that work is done.
+`backend/trusted_evidence.py` now loads `backend/data/replay.json`, exported from the actual deterministic frontend generator (`seed=2026`, `eventCount=1200`). The backend recomputes the ledger SHA-256 and checks IDs and timestamps. The client supplies only the match, replay time and up to 10 evidence IDs; it never supplies an event description, score or statistics. Missing/invalid ledger returns HTTP 503; unknown/future evidence returns HTTP 422. The API derives its own descriptions and score as of the selected time.
+
+`node scripts/exportReplay.mjs` must run whenever `src/engine/generateEvents.ts` or `src/data/demoMatch.ts` changes. Checksums detect accidental drift, not a malicious modification to the code/export together. This preserves the current fixed seeded demo, not arbitrary future match IDs or seeds.
 
 ## Production warning
 
