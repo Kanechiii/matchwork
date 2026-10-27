@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from .ai_budget import FoundryBudget, foundry_budget
+from .observability import handoff_span
 
 ModelCall = Callable[[str, str, dict[str, Any]], Awaitable[str]]
 logger = logging.getLogger("matchwork.agents")
@@ -135,7 +136,8 @@ async def orchestrate_foundry_insight(
             raise AgentBudgetRejected(refusal)
         model_calls += 1
         try:
-            return await invoke(role, instructions, payload)
+            with handoff_span(role):
+                return await invoke(role, instructions, payload)
         finally:
             limiter.release()
 
