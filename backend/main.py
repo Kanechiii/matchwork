@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from typing import Any, Literal
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 from openai import OpenAIError
@@ -14,6 +14,7 @@ from .foundry_service import explain_match_event
 from .multi_agent import orchestrate_foundry_insight
 from .observability import configure_tracing
 from .auth import require_ai_access
+from .operator_session import OperatorLogin, start_operator_session, end_operator_session, require_operator_session
 from .trusted_evidence import resolve_evidence, MATCH_ID
 
 
@@ -177,6 +178,28 @@ async def generate_multi_agent_insight(request: TrustedInsightRequest):
         fallback,
     )
     return MultiAgentResponse(**result)
+
+@app.post("/api/browser/session")
+async def browser_session_login(request: Request, response: Response, login: OperatorLogin):
+    return start_operator_session(request, response, login)
+
+
+@app.post("/api/browser/logout", dependencies=[Depends(require_operator_session)])
+async def browser_session_logout(response: Response):
+    return end_operator_session(response)
+
+
+@app.post(
+    "/api/browser/agents/insights",
+    response_model=MultiAgentResponse,
+    dependencies=[Depends(require_operator_session)],
+)
+async def browser_agent_insight(request: TrustedInsightRequest):
+    """Optional authenticated operator browser route; no bearer secret in JS."""
+    evidence, fallback = verified_request(request)
+    result = await orchestrate_foundry_insight(evidence, request.audience, fallback)
+    return MultiAgentResponse(**result)
+
 
 # Serve the production React application.
 FRONTEND_DIR = (
