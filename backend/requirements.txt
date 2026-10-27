@@ -4,3 +4,4 @@ openai
 python-dotenv
 pydantic
 agent-framework-openai==1.14.3
+redis>=5,<7
