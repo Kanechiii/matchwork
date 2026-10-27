@@ -11,9 +11,9 @@ except ImportError:
     TestClient = None
 
 VALID = {
-    "match_id": "matchwork-curated-security-fixture-v1",
-    "as_of_seconds": 4680,
-    "evidence_ids": ["safe-pass-001", "safe-shot-001"],
+    "match_id": "matchwork-demo-001",
+    "as_of_seconds": 30,
+    "evidence_ids": ["evt-0001", "evt-0002"],
     "audience": "analyst",
 }
 TOKEN = "development-only-testing-token-0123456789abcdefgh"
@@ -48,9 +48,9 @@ class AuthEvidenceTests(unittest.TestCase):
 
     def test_fabricated_and_future_events_rejected(self):
         for payload in [
-            {**VALID, "evidence_ids": ["evt-0001"]},
-            {**VALID, "as_of_seconds": 4675},
-            {**VALID, "evidence_ids": ["safe-shot-001", "safe-shot-001"]},
+            {**VALID, "evidence_ids": ["evt-9999"]},
+            {**VALID, "as_of_seconds": 0},
+            {**VALID, "evidence_ids": ["evt-0002", "evt-0002"]},
             {**VALID, "match_id": "fake-match"},
         ]:
             with self.subTest(payload=payload):
@@ -74,7 +74,7 @@ class AuthEvidenceTests(unittest.TestCase):
         self.assertEqual(response.json()["model_calls"], 0)
         self.assertEqual(response.json()["status"], "multi_agent_disabled")
         self.assertEqual(
-            response.json()["evidence_ids"], ["safe-pass-001", "safe-shot-001"]
+            response.json()["evidence_ids"], ["evt-0001", "evt-0002"]
         )
 
 
