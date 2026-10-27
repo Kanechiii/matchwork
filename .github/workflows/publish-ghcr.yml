@@ -32,7 +32,6 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/kanechiii/matchwork-demo:v1
             ghcr.io/kanechiii/matchwork-demo:${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/Kanechiii/matchwork

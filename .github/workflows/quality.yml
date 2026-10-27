@@ -36,8 +36,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install pinned Python backend dependencies
+        run: python3 -m pip install -r backend/requirements.txt
+
+      - name: Export canonical synthetic replay data
+        run: node scripts/exportReplay.mjs
+
       - name: Verify Foundry request-budget safeguards
         run: python3 -m unittest discover -s backend/tests -p 'test_*.py'
+
+      - name: Verify real Agent Framework imports and construction (offline)
+        run: |
+          AZURE_OPENAI_BASE_URL=https://demo.openai.azure.com/openai/v1/ \
+          AZURE_OPENAI_API_KEY=ci-placeholder-not-a-secret \
+          AZURE_OPENAI_DEPLOYMENT=ci-model \
+          python3 -m backend.diagnose_agents
+
+      - name: Evaluate agent evidence and resilience without Azure calls
+        run: python3 -m backend.evaluate_agents
 
       - name: Production build
         run: npm run build

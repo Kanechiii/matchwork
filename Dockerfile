@@ -9,6 +9,7 @@ RUN npm ci
 
 COPY . .
 RUN npm run build
+RUN node scripts/exportReplay.mjs
 
 # Stage 2: Run FastAPI and serve React
 FROM python:3.12-slim
@@ -20,6 +21,7 @@ COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend ./backend
+COPY --from=frontend /app/backend/data/replay.json ./backend/data/replay.json
 COPY --from=frontend /app/dist ./dist
 
 ENV PYTHONUNBUFFERED=1
