@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { SyntheticMatch } from "./types/match";
 import "./LandingPage.css";
 
@@ -35,6 +35,40 @@ function PitchPreview({ match }: LandingPageProps) {
 }
 
 function LandingPage({ match }: LandingPageProps) {
+  const [activeSection, setActiveSection] = useState("");
+  const [headerScrolled, setHeaderScrolled] = useState(false);
+
+  useEffect(() => {
+    const sectionIds = ["lp-story", "lp-how", "lp-views"];
+    let frame = 0;
+
+    const updateFromScroll = () => {
+      frame = 0;
+      setHeaderScrolled(window.scrollY > 20);
+      let visible = "";
+      for (const id of sectionIds) {
+        const section = document.getElementById(id);
+        if (section && section.getBoundingClientRect().top <= 175) {
+          visible = id;
+        }
+      }
+      setActiveSection((current) => current === visible ? current : visible);
+    };
+
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(updateFromScroll);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    onScroll();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
   useEffect(() => {
     const sections = document.querySelectorAll<HTMLElement>(".lp-reveal");
     if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -55,9 +89,13 @@ function LandingPage({ match }: LandingPageProps) {
   return (
     <main className="lp-page">
       <a className="lp-skip" href="#lp-story">Skip to the story</a>
-      <header className="lp-header">
+      <header className={`lp-header${headerScrolled ? " lp-header-scrolled" : ""}`}>
         <a className="lp-logo" href="#top" aria-label="Matchwork home"><span className="lp-logo-mark">◆</span> MATCHWORK<span>.</span></a>
-        <nav className="lp-nav" aria-label="Landing page"><a href="#lp-story">The idea</a><a href="#lp-how">How it works</a><a href="#lp-views">For every kind of fan</a></nav>
+        <nav className="lp-nav" aria-label="Explore Matchwork">
+          <a href="#lp-story" aria-current={activeSection === "lp-story" ? "location" : undefined}>The idea</a>
+          <a href="#lp-how" aria-current={activeSection === "lp-how" ? "location" : undefined}>How it works</a>
+          <a href="#lp-views" aria-current={activeSection === "lp-views" ? "location" : undefined}>Who it's for</a>
+        </nav>
         <a className="lp-nav-cta" href="#/studio">Open the studio <span aria-hidden="true">↗</span></a>
       </header>
 
