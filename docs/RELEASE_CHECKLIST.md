@@ -1,63 +1,54 @@
-# Matchwork — Hackathon release and submission checklist
+# Matchwork — Hackathon Release and Submission Checklist
 
-## Official deadline and requirements
-- **Submission cutoff:** October 27, 2026, 11:59 PM Pacific Time (October 28, 2026, 2:59 PM Philippines). Leave margin for timezone, encoding and upload failures.
-- Submit on https://aka.ms/insidethegame.
-- A short project pitch describing the problem, approach, and Microsoft technology.
-- A **public video shorter than two minutes** showing the software functioning on its intended device. Host on YouTube, Vimeo, Facebook Video, or Youku.
-- A public GitHub repository: https://github.com/Kanechiii/matchwork
-- A free, accessible working-project link for judges through the judging period. No account required for the planned demo.
-- Original content only; football events and team names are fictional. Do not include unlicensed broadcast footage, third-party logos, music or protected footage.
-- English submission content and testing instructions.
-- License and team contributor permissions must be decided by humans before final submission; no license is assumed here.
+## Purpose
 
-## Intended release URL (NOT published yet)
-https://kanechiii.github.io/matchwork/
+Use this checklist for the final *Inside the Game: Developer Hackathon 2026* submission. It replaces the former GitHub Pages-centric release process; old phase records remain historical.
 
-Publishing is intentionally **manual-only**. A code merge does not deploy anything.
+## Submission Requirements
 
-## Pre-release gate
-1. Merge the validated release-readiness PR to main after approval.
-2. Confirm GitHub Actions quality checks pass on main.
-3. Review security permissions: publishing is from main only; Pages workflow grants read-only build permissions and Pages deployment permissions only in the deploy job.
-4. In GitHub Settings → Pages choose **GitHub Actions** as Source. Verify the `github-pages` environment restricts deployment to `main` and apply approval protections where available.
-5. Review model transparency and confirm all media, names, and icons are properly licensed.
-6. Obtain explicit project-owner approval **before** clicking Run workflow.
+- [ ] Submit the project through [the official portal](https://aka.ms/insidethegame) before **October 27, 2026, 11:59 PM PDT** (October 28, 2026, 2:59 PM in the Philippines)
+- [ ] Provide a public GitHub repository and working, free-to-judge application URL
+- [ ] Provide a **public demo video under two minutes** showing the actual application
+- [ ] Provide an accurate English project description with Microsoft technology details
+- [ ] Confirm rights for all media, team contributions and license decisions
+- [ ] Test judge accessibility without exposing backend access tokens
 
-## Publication steps (after explicit authorization)
-1. Open repository → Actions → **Publish Matchwork to GitHub Pages**.
-2. Use **Run workflow**, choose `main`, then review and run.
-3. Inspect deployment result and final URL; confirm no security warnings.
-4. Open the public site in private/incognito browsing, mobile viewport and desktop viewport.
-5. Test replay play/pause/seek/restart, 1×/4×/16× speed, Fan/Analyst views, team focus, model status and error fallback, event evidence, recaps, and keyboard interaction.
-6. On a fresh browser check DevTools console and Network; reject deployment if JS, CSS, favicon, or ONNX CDN resources cannot load.
-7. Retest without a network connection: UI should clearly distinguish unavailable inference rather than invent predictions.
-8. Record the exact demo URL and test date.
+## Deployment and Quality Gates
 
-## Demo storyboard (target ~100–110 seconds)
-- 0–12s: Problem: football context beyond the scoreboard; Matchwork tagline.
-- 12–28s: Fictional dataset, event replay, time-indexed statistics.
-- 28–46s: Seek and play; show score, stats and evidence updating.
-- 46–67s: Microsoft ONNX Runtime Web synthetic-trained classifier and cautious scores.
-- 67–85s: Fan view vs Analyst view, team focus, and traceable source event IDs.
-- 85–102s: Automatically generated synthetic-event recap and explainability.
-- 102–110s: Public GitHub link, application link, concise limitation statement.
+- [x] Foundry feature PR #13 merged into main and quality CI passed on its head
+- [x] Redis atomic attempt reservation succeeded from Azure Container Apps
+- [x] Secure app revision 0000005 was provisioned and running at verification
+- [x] Browser replay, pause and recap were reported to function
+- [ ] Documentation PR #12 updated and merged after fresh CI
+- [ ] Run final quality workflow on main after docs merge
+- [ ] Recheck secure demo and `/health` in an incognito window
+- [ ] Distinguish Foundry model-backed response from rule-based fallback
+- [ ] Verify responsive layout and accessibility on desktop and mobile
+- [ ] Capture concise screenshots and final code SHA
 
-Use screen recording of the running application and narration. Avoid copyrighted footage or music. Video MUST be **under 120 seconds**, not exactly 120 seconds.
+## Current Live Demo
 
-## Submission pitch draft
-**Matchwork — The game, understood.** Matchwork turns reproducible, synthetic football events into live replay statistics, contextual explanations and accessible match stories. The web experience uses Microsoft ONNX Runtime Web for an illustrative in-browser match-state classifier, while transparent, evidence-linked event statistics explain the context for fans and analysts. Two viewing modes and team focus demonstrate how a single event stream supports multiple audiences. Its labels and match data are synthetic; model scores are not validated real-world football predictions. The open-source tooling runs without paid cloud dependencies.
+[Matchwork secure Azure demo](https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/) is the currently verified app. It is hosted on Azure Container Apps in Japan East. An older `matchwork-demo` deployment may exist, but do not use it as the primary submission URL without retesting. See [deployment details](DEPLOYMENT_CURRENT.md).
 
-## Team ownership and review
-- **Project lead:** owns release readiness, GitHub Pages settings, final PR merge, demo capture, eligibility checks, team permissions and hackathon submission.
-- **Collaborator 1 (UI, overlay, accessibility):** polish typography, mobile/tablet layout, keyboard usability, optional synchronized presentation overlay; avoid modifying model/training files. Submit a PR against main.
-- **Collaborator 2 (AI evidence and reliability):** validate feature handling, strengthen explanation groundedness, add regression tests and browser runtime diagnostics; avoid unrelated style changes. Submit a PR against main.
-- Verify that invitations have actually been accepted in repository Settings → Collaborators. Do not assume invitation equals access. Assign named issue owners after confirmation.
-- Keep `main` stable; one branch/PR per issue. No direct pushes to main. Do not delete collaborators' branches without approval.
+## Demonstration Storyboard
 
-## Outstanding risks
-- Phase 3 ONNX Runtime Web is CDN-loaded; public site requires CDN access. Real browser smoke testing is still required.
-- Model is trained on handcrafted synthetic state templates and not externally validated on authentic football data.
-- MIT license awaits team agreement. Never publish a LICENSE file before consensus.
-- Demo video, live public URL, submission form, and final judging accessibility are not completed by the repo workflow.
-- The official rules describe five judging dimensions, each weighted 20%, including agentic design; do not claim multi-agent orchestration unless it is genuinely implemented and verified.
+Target approximately 100–110 seconds to remain safely below the 120-second limit.
+
+| Segment | Content |
+| --- | --- |
+| 0–12 seconds | Problem and one-sentence Matchwork value proposition |
+| 12–30 seconds | Fictional synthetic match, replay and event feed |
+| 30–50 seconds | Play/pause/seek and synchronized statistics |
+| 50–70 seconds | ONNX model indicator, evidence IDs and appropriate caveats |
+| 70–92 seconds | Fan versus Analyst narrative and recap |
+| 92–110 seconds | Azure/Foundry architecture, secure budget and final links |
+
+Do not show third-party broadcast footage or disclose model credentials. If no live Foundry call is verified, describe the recap as evidence-linked without claiming a specific model generated that example.
+
+## Risks and Ownership
+
+Maintain one PR per concern and avoid direct pushes to `main`. Any cloud change should be deliberate because the Azure for Students subscription has cost exposure. Azure Cost Management notifications do not establish a spending ceiling. The optional operator session is not a judge sign-in mechanism. The demo video, formal application and contributor/license approvals still require human action.
+
+## Related Documents
+
+[Project README](../README.md) · [Deployment](DEPLOYMENT_CURRENT.md) · [Cost guard](../PHASE7_COST_GUARD.md) · [Documentation index](README.md)
