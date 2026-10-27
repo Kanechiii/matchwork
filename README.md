@@ -1,209 +1,118 @@
+# Matchwork — The Game, Understood
 
-# Matchwork
+**Explainable, evidence-linked football intelligence for fans and analysts.** Built for the Microsoft × Premier League *Inside the Game: Developer Hackathon 2026*.
 
-**The game, understood.**
+[Live secure demo](https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/) · [Repository](https://github.com/Kanechiii/matchwork) · [Documentation](docs/README.md) · [Release checklist](docs/RELEASE_CHECKLIST.md)
 
-Matchwork is a synthetic football intelligence platform developed for the Microsoft Premier League Inside the Game Developer Hackathon 2026.
+> **Synthetic demonstration:** All teams, players and football events are fictional. Matchwork does not ingest live Premier League data or footage. ONNX model scores are illustrative and are not calibrated predictions for real matches.
 
-The project is designed to transform football event data into statistics, evidence-based match insights, and personalized viewing experiences.
+## Overview
 
-## Current Project Status
+Matchwork turns a seeded 90-minute fictional football match into synchronized replay, event-derived statistics, contextual intelligence and evidence-linked recaps. The experience separates accessible **Fan** explanations from more detailed **Analyst** interpretation. The app remains useful when either AI service is unavailable: rules-based insight continues and ONNX availability is disclosed.
 
-**Phase 3: Synthetic Match Intelligence — Feature Development**
+## Try the Demo
 
-The application currently supports:
+1. Open the [secure application](https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/). Allow for a cold start after inactivity.
+2. Play, pause, restart or seek the fictional match. Inspect synchronized score, event feed and statistics.
+3. Explore Fan and Analyst explanations and inspect cited event identifiers.
+4. Observe replay-linked recaps, and distinguish model-backed content from deterministic fallback when the UI exposes its source.
 
-- Reproducible synthetic football match generation
-- Two fictional teams with 11 starting players each
-- A 90-minute simulated match
-- Configurable event generation from 900 to 1,400 events
-- Passes, shots, tackles, defensive pressure, and possession changes
-- Event-derived team statistics
-- Time-based possession estimates
-- Interactive match replay
-- Play, pause, restart, and timeline seeking
-- Playback speeds of 1x, 4x, and 16x
-- Synchronized scoreboard, statistics, and event feed
-- Automated generator, statistics, replay, and integration verification
-- Rolling three-minute feature windows, based only on visible replay events
-- Compact synthetic-trained ONNX classification of control, pressure and transitions
-- Microsoft ONNX Runtime Web WASM inference when browser runtime is available
-- Explicit failure state when ONNX inference is unavailable
-- Event-grounded explanations, evidence IDs and generated match recaps
-- Separate Fan and Analyst presentations and team-focused narratives
+**Access boundary:** Public viewing does not imply unauthenticated access to paid model endpoints. Both `POST /api/insights` and `POST /api/agents/insights` require server-side bearer authorization. Never publish the token or embed it in browser JavaScript. The opt-in browser operator session is not a public sign-in system. A visible recap alone does not establish that a Foundry model request ran.
 
-The implementation uses synthetic data only.
-
-## Planned Features
-
-The following features are not yet implemented:
-
-- Expanded AI inference and model validation with realistic synthetic match labels
-- Player-focused intelligence
-- Automated match narratives and recaps
-- Broadcast-style insight overlays
-- Public deployment
-
-These capabilities will be developed in subsequent authorized phases.
-
-## Technology Stack
-
-### Currently Implemented
-
-- React
-- TypeScript
-- Vite
-- CSS
-- Node.js 24
-- Git and GitHub
-
-### Planned
-
-- Python for offline machine learning
-- Microsoft ONNX Runtime Web for browser inference
-- GitHub Pages for static application hosting
-
-GitHub Actions runs automated build and regression verification. Browser ONNX Runtime Web uses version-pinned CDN imports and WASM assets. A network connection is currently required for Microsoft AI inference.
-
-## Project Structure
+## Architecture
 
 ```text
-matchwork/
-├── .github/
-│   └── workflows/
-│       └── quality.yml
-├── public/
-├── scripts/
-│   ├── verifyGenerator.mjs
-│   ├── verifyStats.mjs
-│   ├── verifyReplay.mjs
-│   └── verifyIntegration.mjs
-├── src/
-│   ├── data/
-│   │   └── demoMatch.ts
-│   ├── engine/
-│   │   ├── generateEvents.ts
-│   │   ├── calculateStats.ts
-│   │   └── replay.ts
-│   ├── types/
-│   │   └── match.ts
-│   ├── App.tsx
-│   └── App.css
-├── package.json
-└── package-lock.json
+Seeded fictional match + replay event generator
+                   │
+                   ▼
+React + TypeScript + Vite dashboard
+ ├─ Replay, scoring, match statistics, evidence feed
+ ├─ ONNX Runtime Web (synthetic-trained WASM classifier)
+ └─ Rule-based fallback and Fan / Analyst explanations
+                   │
+           Protected API boundary
+                   ▼
+FastAPI in Azure Container Apps (Japan East)
+ ├─ Trusted evidence ledger (exported from seeded replay)
+ ├─ Bearer-token protected single-agent and specialist endpoints
+ ├─ Microsoft Foundry model inference (opt-in specialist path)
+ ├─ Atomic Redis shared attempt budget (enabled on secure demo)
+ └─ Explicit AI-unavailable and budget-limited fallback
+
+GitHub Actions → GHCR image → Azure Container Apps
+                            ↕ private VNet / TLS
+                         Azure Managed Redis
 ```
 
-Additional configuration and assets are retained from the Vite foundation.
+The backend verifies `match_id`, `as_of_seconds`, `evidence_ids` and `audience` against a canonical server-side replay ledger. It does **not** accept caller-authored `fallback_text` or arbitrary match descriptions. The multi-agent path includes model-backed specialist roles, bounded handoff and evidence auditing; **its existence in the repository is not proof that the public UI invokes it**.
+
+## Technology
+
+| Layer | Implementation |
+| --- | --- |
+| Frontend | React, TypeScript, Vite, CSS |
+| Replay and analysis | Deterministic seeded events, rolling context, event-derived statistics |
+| Browser ML | Microsoft ONNX Runtime Web / WASM with synthetic prototypes |
+| Backend | Python 3.12, FastAPI, trusted evidence validation |
+| Generative AI | Microsoft Foundry; Agent Framework-backed specialist workflow is opt-in |
+| Hosting | Azure Container Apps, GHCR, GitHub Actions |
+| Cost safeguards | Azure Managed Redis atomic shared AI-attempt ledger, per-process concurrency, quotas and budget alerts |
 
 ## Local Development
 
-### Requirements
+Requires Node.js 24, npm and Python 3.12+.
 
-- Node.js 24
-- npm
-
-### Install Dependencies
-
-```bash
+```powershell
+git clone https://github.com/Kanechiii/matchwork.git
+cd matchwork
 npm ci
-```
-
-### Start the Development Server
-
-```bash
 npm run dev
 ```
 
-Open the local URL displayed by Vite.
+For the backend, in another terminal:
 
-### Production Build
-
-```bash
-npm run build
+```powershell
+python -m pip install -r backend/requirements.txt
+node scripts/exportReplay.mjs
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-### Lint
-
-```bash
-npm run lint
-```
+The browser replay and rule-based recap work without paid AI credentials. Paid endpoints require an appropriately configured server-side access token, trusted evidence payload, Foundry endpoint and an available shared attempt ledger. Keep `MATCHWORK_AI_ENABLED=false` until those safeguards are configured. See [API security](docs/PHASE7B_API_SECURITY.md) and [Foundry workflow](docs/FOUNDRY_MULTI_AGENT.md). Do not commit credentials or `.env` files.
 
 ## Verification
 
-Run the four verification scripts:
-
-```bash
-node scripts/verifyGenerator.mjs
-node scripts/verifyStats.mjs
-node scripts/verifyReplay.mjs
-node scripts/verifyIntegration.mjs
+```powershell
+npm ci
+node scripts/exportReplay.mjs
+npm run build
+npm run lint
+python -m unittest discover -s backend/tests -p 'test_*.py'
+python -m backend.evaluate_agents
 ```
 
-The integration suite verifies 12 combinations of seeds and event counts, covering 14,000 generated events in total.
+Additional reproducibility, replay, ONNX, enterprise and workflow checks run in [GitHub Actions](.github/workflows/quality.yml).
 
-The verification scripts use Node.js built-in functionality and require no additional testing packages.
+## Security, Cost and Limitations
 
-## Explainable AI and Model Provenance
+- The canonical synthetic ledger and event IDs support auditing but do not establish factual correctness of generated narratives.
+- The ONNX classifier is trained on synthetic prototypes, not a real-world validated football dataset.
+- The API bearer token remains server-side; the optional operator cookie/session is not production identity management.
+- The secure Azure demo uses a private-endpoint Redis instance and an atomic hourly/daily reservation script for **shared AI attempt limits**. A reservation test succeeded; this is **not** a hard spending cap, user quota or durable audit trail.
+- Azure budgets notify; they do not automatically shut off billable inference. Redis loss or alternate Foundry clients may bypass attempts recorded by this application.
+- A rule-based recap should not be represented as proof of live Foundry inference. Model-backed specialist deployment requires its own verification.
+- No official football broadcast media or live Premier League feeds are bundled.
 
-The match-state model is a small ONNX logistic classifier (7 input features, 3 labels, 340-byte graph). It runs using Microsoft's ONNX Runtime Web WASM backend when the pinned public runtime resources load in the browser.
+See [deployment evidence](docs/DEPLOYMENT_CURRENT.md), [cost controls](PHASE7_COST_GUARD.md), and [documentation index](docs/README.md).
 
-The synthetic labels and training exemplars are deliberately generated from handcrafted state prototypes. Reproduce them without any Python dependencies:
+## Submission Readiness
 
-```bash
-python scripts/train_match_state.py
-```
+- [x] Repository with documented synthetic-data limitations
+- [x] Publicly reachable secure Azure Container Apps demo and replay/recap smoke test
+- [x] Redis-backed shared attempt reservation tested in the secure environment
+- [ ] Verify model-backed Foundry output separately from rules-based fallback for judging
+- [ ] Check desktop/mobile presentation, screenshots and incognito access
+- [ ] Publish a demo video **under two minutes**
+- [ ] Confirm contributor permissions and license decision
+- [ ] Complete submission at [Inside the Game](https://aka.ms/insidethegame)
 
-The model is an illustrative proof of ONNX inference and **has not been validated on real football data**. Synthetic-prototype validation accuracy does not measure performance on authentic matches.
-
-Prediction scores are **not** calibrated real-world probabilities. Explanations and recaps use deterministic templates grounded in observed synthetic event counts and IDs, not a generative language model. If the runtime fails to load, the dashboard transparently reports AI unavailable rather than fabricating inference.
-
-The classifier input contains passing continuity, pressure, turnover and shot rates, event tempo, final-third action share, and score tension. Only events up to the replay timestamp are used.
-
-### Phase 3 smoke test
-
-```bash
-node scripts/verifyIntelligence.mjs
-```
-
-## Data Integrity and Limitations
-
-All teams, players, and events are fictional.
-
-The system does not depend on live Premier League feeds, actual player tracking, or unlicensed broadcast footage.
-
-The match generator is a simplified simulation rather than a complete implementation of football rules.
-
-Possession is estimated from synthetic possession transitions. It is not measured from physical ball-tracking data.
-
-TypeScript contracts and current verification scripts do not establish comprehensive runtime validation for arbitrary external match files.
-
-Current match statistics are calculated from generated events rather than hardcoded dashboard values.
-
-## CI and Deployment
-
-A GitHub Actions workflow checks:
-
-1. Locked dependency installation
-2. Production compilation
-3. Lint
-4. Synthetic event generation
-5. Statistics calculation
-6. Replay consistency
-7. Multi-seed integration
-8. Phase 3 intelligence feature extraction
-
-These are automated verification checks, not a deployment workflow.
-
-GitHub Pages is the planned public hosting platform but is not yet configured.
-
-## License
-
-MIT licensing is the preferred option pending final contributor agreement.
-
-No explicit open-source license has been issued yet.
-
-## Development and Contributions
-
-Development is currently proceeding in solo mode.
-
-Future contributors should use feature branches and pull requests rather than modifying the stable main branch directly.
+**Deadline:** October 27, 2026, 11:59 PM Pacific time (October 28, 2026, 2:59 PM Philippines). Detailed acceptance steps: [release checklist](docs/RELEASE_CHECKLIST.md).
