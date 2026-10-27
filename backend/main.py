@@ -64,7 +64,7 @@ class InsightRequest(BaseModel):
 
 
 class TrustedInsightRequest(BaseModel):
-    match_id: Literal["matchwork-curated-security-fixture-v1"]
+    match_id: Literal["matchwork-demo-001"]
     as_of_seconds: int = Field(ge=0, le=5400)
     evidence_ids: list[str] = Field(min_length=1, max_length=10)
     audience: Literal["fan", "analyst"] = "fan"
@@ -75,7 +75,7 @@ def verified_request(request: TrustedInsightRequest) -> tuple[dict[str, Any], st
         request.match_id, request.as_of_seconds, request.evidence_ids
     )
     fallback = (
-        "Observed synthetic fixture: " + evidence["description"] + "."
+        "Observed synthetic replay: " + evidence["description"] + "."
     )
     return evidence, fallback
 
@@ -147,14 +147,14 @@ async def generate_insight(
         return InsightResponse(
             source="foundry",
             explanation=explanation,
-            evidence_ids=request.event.evidence_ids,
+            evidence_ids=evidence["evidence_ids"],
             status="success"
         )
 
     except (OpenAIError, RuntimeError, KeyError):
         return InsightResponse(
             source="rule-based",
-            explanation=request.fallback_text,
+            explanation=fallback,
             evidence_ids=request.event.evidence_ids,
             status="ai_unavailable"
         )
@@ -169,8 +169,8 @@ class MultiAgentResponse(InsightResponse):
 
 @app.post("/api/agents/insights", response_model=MultiAgentResponse, dependencies=[Depends(require_ai_access)])
 async def generate_multi_agent_insight(request: TrustedInsightRequest):
-    evidence, fallback = verified_request(request)
     """Opt-in, budgeted two-specialist Foundry workflow with safe fallback."""
+    evidence, fallback = verified_request(request)
     result = await orchestrate_foundry_insight(
         evidence,
         request.audience,
