@@ -49,6 +49,7 @@ class SharedAttemptLedger:
         except Exception:
             return "ai_budget_unavailable"
 
+
 def from_environment() -> SharedAttemptLedger | None:
     if os.getenv(
         "MATCHWORK_SHARED_BUDGET_ENABLED", "false"
@@ -61,7 +62,12 @@ def from_environment() -> SharedAttemptLedger | None:
         return SharedAttemptLedgerUnavailable()
 
     try:
+        from urllib.parse import urlsplit
         from redis.cluster import RedisCluster
+
+        hostname = urlsplit(url).hostname
+        if not hostname:
+            return SharedAttemptLedgerUnavailable()
 
         client = RedisCluster.from_url(
             url,
@@ -69,6 +75,10 @@ def from_environment() -> SharedAttemptLedger | None:
             socket_timeout=2,
             health_check_interval=30,
             ssl_check_hostname=True,
+            address_remap=lambda address: (
+                hostname,
+                address[1],
+            ),
         )
 
         return SharedAttemptLedger(client)
