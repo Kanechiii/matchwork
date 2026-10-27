@@ -52,12 +52,21 @@ async def framework_model_call(
     from agent_framework import Agent
     from agent_framework.openai import OpenAIChatClient
 
+    # Reuse the same working OpenAI-compatible Foundry transport as the
+    # original /api/insights endpoint. An explicit AsyncOpenAI client avoids
+    # Agent Framework's ambient OpenAI-vs-Azure environment route selection.
+    from openai import AsyncOpenAI
+
+    transport = AsyncOpenAI(
+        base_url=base_url,
+        api_key=api_key,
+        timeout=10.0,
+        max_retries=0,
+    )
     agent = Agent(
         client=OpenAIChatClient(
             model=deployment,
-            base_url=base_url,
-            api_key=api_key,
-            timeout=10.0,
+            async_client=transport,
         ),
         name=role,
         instructions=instructions,
