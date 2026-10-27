@@ -1,0 +1,12 @@
+.pitch { display: block; width: 100%; height: auto; }
+.pitch-bg { fill: var(--pitch); }
+.pitch-stripe { fill: var(--pitch-stripe); }
+.pitch-lines { stroke: var(--pitch-line); stroke-width: 0.45; }
+.pitch-spot { fill: var(--pitch-line); }
+.pitch-dot { stroke: var(--surface); stroke-width: 0.4; opacity: .45; transition: cx .3s ease, cy .3s ease; }
+.pitch-dot.is-latest { opacity: 1; stroke-width: 0.7; }
+.pitch-dot.is-home { fill: var(--home); }
+.pitch-dot.is-away { fill: var(--away); }
+.pitch-ring { fill: none; stroke-width: 0.5; opacity: .6; }
+.pitch-ring.is-home { stroke: var(--home); }
+.pitch-ring.is-away { stroke: var(--away); }

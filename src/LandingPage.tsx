@@ -1,112 +1,184 @@
-import { useEffect } from "react";
+import { useMemo } from "react";
+import { ArrowRight, Info } from "lucide-react";
 import type { SyntheticMatch } from "./types/match";
+import { createReplayState, getReplayFrame, seekReplay } from "./engine/replay";
+import { extractWindowFeatures } from "./ai/features";
+import { buildMatchRecap } from "./ai/explanations";
+import { Brand } from "./components/Brand";
+import { ThemeToggle } from "./components/ThemeToggle";
+import { Pitch } from "./components/Pitch";
 import "./LandingPage.css";
 
 interface LandingPageProps {
   match: SyntheticMatch;
 }
 
-function PitchPreview({ match }: LandingPageProps) {
-  const recentSample = match.events.slice(0, 7);
-  const home = match.metadata.homeTeam;
-  return (
-    <div className="lp-pitch-card">
-      <div className="lp-pitch-top"><span className="lp-live-indicator" /> A CLOSER LOOK AT THE GAME <span>01 / THE PITCH</span></div>
-      <div className="lp-pitch-stage">
-        <svg viewBox="0 0 600 370" role="img" aria-label="A football pitch with locations of real events from the fictional demonstration match" className="lp-pitch-svg">
-          <defs>
-            <pattern id="lp-stripes" width="90" height="370" patternUnits="userSpaceOnUse"><rect width="45" height="370" fill="#b7ed883b" /></pattern>
-          </defs>
-          <rect width="600" height="370" fill="#17352e" rx="12" />
-          <rect x="0" y="0" width="600" height="370" fill="url(#lp-stripes)" opacity=".4" rx="12"/>
-          <g fill="none" stroke="#bcdfc1" strokeWidth="2" opacity=".46"><rect x="18" y="18" width="564" height="334" rx="2" /><path d="M300 18V352"/><circle cx="300" cy="185" r="64"/><circle cx="300" cy="185" r="3" fill="#bcdfc1"/><path d="M18 97H120V273H18 M582 97H480V273H582 M18 142H65V228H18 M582 142H535V228H582"/><path d="M150 138A55 55 0 0 1 150 232 M450 138A55 55 0 0 0 450 232" /></g>
-          {recentSample.map((event, i) => (
-            <g key={event.id}>
-              <circle cx={18 + event.x * 5.64} cy={18 + event.y * 3.34} r={i===recentSample.length-1 ? 13 : 8} fill={event.teamId===home.id ? "#82baff" : "#ffae94"} fillOpacity={i===recentSample.length-1 ? 1 : .7} stroke="#dffada" strokeWidth={i===recentSample.length-1 ? 3 : 1.5}/>
-              {i===recentSample.length-1 && <circle cx={18 + event.x * 5.64} cy={18 + event.y * 3.34} r="23" fill="none" stroke="#c4fc94" strokeWidth="2" className="lp-event-ring"/>}
-            </g>
-          ))}
-        </svg>
-        <div className="lp-pitch-callout"><span className="lp-pitch-badge">EVENTS, NOT GUESSWORK</span><strong>See where the action happens.</strong><small>Sample positions from our fictional match.</small></div>
-      </div>
-      <div className="lp-pitch-bottom"><span><i className="lp-dot lp-home-dot" /> {match.metadata.homeTeam.abbreviation}</span><span><i className="lp-dot lp-away-dot" /> {match.metadata.awayTeam.abbreviation}</span><span>BASED ON RECORDED EVENTS</span></div>
-    </div>
-  );
+function clock(seconds: number) {
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+/** A real snapshot of the studio at one moment, built with the same engine the studio uses. */
+function useSampleMoment(match: SyntheticMatch) {
+  return useMemo(() => {
+    const firstGoal = match.events.find((e) => e.type === "shot" && e.outcome === "goal");
+    const time = Math.min(match.metadata.durationSeconds, firstGoal ? firstGoal.elapsedSeconds + 20 : 1458);
+    const frame = getReplayFrame(match, seekReplay(createReplayState(match), match, time));
+    const features = extractWindowFeatures(match, time);
+    return { time, frame, features, recap: buildMatchRecap(match, time) };
+  }, [match]);
+}
+
+const pipeline = [
+  { title: "Events", body: "A seeded generator produces every pass, shot, tackle, pressure and turnover, each with a timestamp and a pitch position." },
+  { title: "Replay window", body: "As the clock moves, statistics update and a rolling three-minute window summarises the latest spell of play." },
+  { title: "Classifier", body: "A small ONNX model runs in your browser and labels that spell as control, pressure or transition." },
+  { title: "Explanation", body: "Pause the replay and Matchwork requests a written explanation. If the AI service is unavailable, a rules-based recap takes over and says so." },
+];
+
+const principles = [
+  { term: "Fictional by design", detail: "Every team, player and event is synthetic. Nothing comes from live Premier League data or footage." },
+  { term: "Scores are illustrative", detail: "Classifier outputs come from a model trained on synthetic prototypes. They are not calibrated predictions." },
+  { term: "Fallbacks are disclosed", detail: "When the AI service or the in-browser model is unavailable, the studio labels the rules-based result instead of guessing." },
+  { term: "Evidence you can trace", detail: "Explanations list the event IDs they were built from, so you can check each one against the event stream." },
+];
+
 function LandingPage({ match }: LandingPageProps) {
-  useEffect(() => {
-    const sections = document.querySelectorAll<HTMLElement>(".lp-reveal");
-    if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      sections.forEach((section) => section.classList.add("lp-visible"));
-      return;
-    }
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("lp-visible");
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.08, rootMargin: "0px 0px -35px 0px" });
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
-  }, []);
+  const homeTeam = match.metadata.homeTeam;
+  const awayTeam = match.metadata.awayTeam;
+  const sample = useSampleMoment(match);
+  const { home, away } = sample.frame.stats;
+  const evidenceIds = sample.features.eventIds.slice(-4);
+
   return (
-    <main className="lp-page">
-      <a className="lp-skip" href="#lp-story">Skip to the story</a>
+    <div className="lp">
+      <a className="lp-skip" href="#lp-main">Skip to content</a>
       <header className="lp-header">
-        <a className="lp-logo" href="#top" aria-label="Matchwork home"><span className="lp-logo-mark">◆</span> MATCHWORK<span>.</span></a>
-        <nav className="lp-nav" aria-label="Landing page"><a href="#lp-story">The idea</a><a href="#lp-how">How it works</a><a href="#lp-views">For every kind of fan</a></nav>
-        <a className="lp-nav-cta" href="#/studio">Open the studio <span aria-hidden="true">↗</span></a>
+        <div className="lp-header-inner">
+          <Brand href="#top" label="Matchwork home" />
+          <nav className="lp-nav" aria-label="Landing page">
+            <a href="#how">How it works</a>
+            <a href="#views">Fan and analyst views</a>
+            <a href="#transparency">Transparency</a>
+          </nav>
+          <div className="lp-header-end">
+            <ThemeToggle />
+            <a className="btn btn-primary lp-header-cta" href="#/studio">Open the studio</a>
+          </div>
+        </div>
       </header>
 
-      <section className="lp-hero" id="top">
-        <div className="lp-hero-copy">
-          <div className="lp-eyebrow"><span /> INSIDE THE GAME <i /> A NEW WAY TO WATCH</div>
-          <h1>Football moves fast.<br/><em>Understanding it</em><br/>shouldn’t.</h1>
-          <p>The final score is only part of the story. Follow every turning point, see why it matters, and explore the game at your own pace.</p>
-          <div className="lp-hero-actions"><a href="#/studio" className="lp-primary-cta">Explore the match <span aria-hidden="true">↗</span></a><a href="#lp-story" className="lp-text-cta">Discover the idea <span aria-hidden="true">↓</span></a></div>
-          <div className="lp-hero-foot"><span className="lp-foot-mark">01—03</span><span>ONE FICTIONAL MATCH.<br/>A WHOLE NEW PERSPECTIVE.</span><span className="lp-scroll-cue" aria-hidden="true">SCROLL TO EXPLORE ↓</span></div>
-        </div>
-        <PitchPreview match={match}/>
-      </section>
+      <main id="lp-main">
+        <section className="lp-hero" id="top">
+          <div className="lp-hero-copy">
+            <p className="lp-overline">Built for Inside the Game, a Microsoft × Premier League developer hackathon</p>
+            <h1>Every match has a story between the goals.</h1>
+            <p className="lp-lede">Matchwork replays a fictional 90-minute match event by event and explains what each spell of play means, citing the exact events behind every explanation.</p>
+            <div className="lp-actions">
+              <a href="#/studio" className="btn btn-primary btn-lg">Open the match studio <ArrowRight aria-hidden="true" /></a>
+              <a href="#how" className="btn btn-secondary btn-lg">See how it works</a>
+            </div>
+            <p className="lp-note"><Info aria-hidden="true" /> Fictional teams and synthetic events. No live Premier League data.</p>
+          </div>
 
-      <section className="lp-intro lp-reveal" id="lp-story">
-        <div className="lp-section-number">01 / THE BIGGER PICTURE</div>
-        <div><p className="lp-intro-super">More than a scoreline.</p><h2>The moments between the goals <em>are the game.</em></h2></div>
-        <p>A completed pass. A sudden turnover. Pressure building toward the box. Matchwork brings those small moments into focus—so you can see the match take shape.</p>
-      </section>
+          <figure className="lp-preview" aria-label={`Studio snapshot at ${clock(sample.time)}`}>
+            <div className="lp-preview-head">
+              <span>Studio snapshot</span>
+              <span className="tabular">{clock(sample.time)} / {clock(match.metadata.durationSeconds)}</span>
+            </div>
+            <div className="lp-preview-score">
+              <span className="lp-team"><i className="lp-chip is-home">{homeTeam.abbreviation}</i>{homeTeam.name}</span>
+              <strong className="tabular" aria-label={`${home.goals} to ${away.goals}`}>{home.goals}<span>–</span>{away.goals}</strong>
+              <span className="lp-team lp-team-away">{awayTeam.name}<i className="lp-chip is-away">{awayTeam.abbreviation}</i></span>
+            </div>
+            <div className="lp-preview-pitch">
+              <Pitch events={sample.frame.recentEvents.slice(-6)} homeId={homeTeam.id} label="Positions of the six most recent events at this moment" />
+            </div>
+            <div className="lp-preview-body">
+              <span className="lp-preview-label">The story so far</span>
+              <p>{sample.recap}</p>
+            </div>
+            <figcaption className="lp-preview-foot">
+              <span>Cites</span>
+              {evidenceIds.length ? evidenceIds.map((id) => <code key={id}>{id}</code>) : <span>no events in this window</span>}
+            </figcaption>
+          </figure>
+        </section>
 
-      <section className="lp-feature lp-feature-one lp-reveal" id="lp-how">
-        <div className="lp-feature-copy"><span className="lp-chapter">02 / FOLLOW THE ACTION</span><h2>Rewind a moment.<br/><em>Find the meaning.</em></h2><p>Move through a 90-minute match, pause wherever you like, and watch the story and statistics follow your position. It's the match on your terms.</p><a href="#/studio" className="lp-inline-cta">Try the replay <span aria-hidden="true">↗</span></a></div>
-        <div className="lp-showcase lp-timeline-showcase" aria-label="Illustration of the replay timeline">
-          <div className="lp-showcase-top"><span>THE MATCH IS IN YOUR HANDS</span><span className="lp-showcase-tag">REPLAY</span></div>
-          <div className="lp-showcase-bigtime">24<span>:</span>18</div>
-          <div className="lp-showcase-progress"><span /></div>
-          <div className="lp-showcase-times"><span>KICK OFF</span><span>HALF TIME</span><span>FULL TIME</span></div>
-          <div className="lp-showcase-play"><span>▶</span> Pause. Play. Explore.</div>
-          <small>Illustrative replay controls; actual interactions are in the studio.</small>
-        </div>
-      </section>
+        <section className="lp-section" id="how" aria-labelledby="how-title">
+          <div className="lp-section-head">
+            <h2 id="how-title">From raw events to an explanation you can check.</h2>
+            <p>Each step uses only what has happened up to the replay clock. Nothing later in the match leaks into an explanation.</p>
+          </div>
+          <ol className="lp-pipeline">
+            {pipeline.map((step, i) => (
+              <li key={step.title}>
+                <span className="lp-step-index tabular">{i + 1}</span>
+                <h3>{step.title}</h3>
+                <p>{step.body}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
 
-      <section className="lp-feature lp-feature-two lp-reveal" id="lp-views">
-        <div className="lp-view-showcase">
-          <div className="lp-view-card lp-view-card-fan"><span className="lp-view-label">FOR THE FAN</span><span className="lp-view-icon">✳</span><h3>What's happening?</h3><p>Pressure is rising. The action is moving forward.</p><div className="lp-view-bottom">THE STORY, MADE SIMPLE <span>↗</span></div></div>
-          <div className="lp-view-card lp-view-card-analyst"><span className="lp-view-label">FOR THE ANALYST</span><div className="lp-mini-bars"><span style={{width:"74%"}}/><span style={{width:"46%"}}/><span style={{width:"61%"}}/></div><h3>Show me the evidence.</h3><p>Event timing, match statistics, and transparent model details.</p><div className="lp-view-bottom">THE DETAIL BEHIND THE PLAY <span>↗</span></div></div>
-        </div>
-        <div className="lp-feature-copy"><span className="lp-chapter">03 / YOUR WAY INTO THE GAME</span><h2>Curious fan?<br/><em>Deep thinker?</em><br/>There's a view for you.</h2><p>Fan view keeps the game human. Analyst view opens up the evidence behind the insights. Switch whenever you want—without losing your place.</p><a href="#/studio" className="lp-inline-cta">Find your view <span aria-hidden="true">↗</span></a></div>
-      </section>
+        <section className="lp-section lp-views" id="views" aria-labelledby="views-title">
+          <div className="lp-section-head">
+            <h2 id="views-title">One moment, two levels of detail.</h2>
+            <p>Switch views at any time without losing your place in the replay. Here is the same moment, {clock(sample.time)}, in each.</p>
+          </div>
+          <div className="lp-compare">
+            <article className="lp-view">
+              <header><h3>Fan view</h3><p>The story in plain language.</p></header>
+              <blockquote>{sample.recap}</blockquote>
+              <ul>
+                <li>A short read on the current spell of play</li>
+                <li>A quick recap of the match so far</li>
+                <li>Where the latest action happened</li>
+              </ul>
+            </article>
+            <article className="lp-view">
+              <header><h3>Analyst view</h3><p>The evidence behind the story.</p></header>
+              <dl className="lp-evidence">
+                <div><dt>Passes</dt><dd className="tabular">{sample.features.passesCompleted}/{sample.features.passesAttempted}</dd></div>
+                <div><dt>Pressures</dt><dd className="tabular">{sample.features.pressures}</dd></div>
+                <div><dt>Turnovers</dt><dd className="tabular">{sample.features.turnovers}</dd></div>
+                <div><dt>Shots</dt><dd className="tabular">{sample.features.shots}</dd></div>
+              </dl>
+              <ul>
+                <li>Classifier scores for control, pressure and transition</li>
+                <li>Feature window, sample time and model status</li>
+                <li>Observed event IDs and the full event stream</li>
+              </ul>
+            </article>
+          </div>
+        </section>
 
-      <section className="lp-close lp-reveal">
-        <div className="lp-close-grid" aria-hidden="true"/>
-        <span className="lp-chapter">READY TO SEE THE GAME DIFFERENTLY?</span>
-        <h2>Don't just watch<br/><em>the game.</em> Read it.</h2>
-        <p>One fictional match. Every moment in your hands. No account needed.</p>
-        <a href="#/studio" className="lp-primary-cta">Enter Matchwork Studio <span aria-hidden="true">↗</span></a>
-      </section>
-      <footer className="lp-footer"><span>MATCHWORK<span className="lp-footer-period">.</span> / THE GAME, UNDERSTOOD.</span><span>Demonstration with fictional teams and synthetic events. No live match data.</span><a href="#top">BACK TO TOP ↑</a></footer>
-    </main>
+        <section className="lp-section lp-transparency" id="transparency" aria-labelledby="transparency-title">
+          <div className="lp-section-head">
+            <h2 id="transparency-title">Built to show its working.</h2>
+            <p>A visible explanation is only useful if you know where it came from.</p>
+          </div>
+          <dl className="lp-principles">
+            {principles.map((p) => (
+              <div key={p.term}><dt>{p.term}</dt><dd>{p.detail}</dd></div>
+            ))}
+          </dl>
+        </section>
+
+        <section className="lp-close" aria-labelledby="close-title">
+          <div>
+            <h2 id="close-title">Pick a moment and see what it means.</h2>
+            <p>One fictional match, fully replayable. No account needed.</p>
+          </div>
+          <a href="#/studio" className="btn btn-primary btn-lg">Open the match studio <ArrowRight aria-hidden="true" /></a>
+        </section>
+      </main>
+
+      <footer className="lp-footer">
+        <span>Matchwork. The game, understood.</span>
+        <span>Demonstration with fictional teams and synthetic events.</span>
+        <a href="#top">Back to top</a>
+      </footer>
+    </div>
   );
 }
 

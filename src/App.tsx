@@ -1,10 +1,12 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import { ChartColumn, ChevronDown, CircleAlert, Info, Pause, Play, RefreshCw, RotateCcw, Users, X } from "lucide-react";
 import type { MatchEvent } from "./types/match";
 import { demoMatch } from "./data/demoMatch";
 import { generateSyntheticMatch } from "./engine/generateEvents";
 import {
   advanceReplay,
+  REPLAY_SPEEDS,
   createReplayState,
   getReplayFrame,
   pauseReplay,
@@ -19,6 +21,10 @@ import { explainMatchState, buildMatchRecap, type AudienceMode } from "./ai/expl
 import type { TeamId } from "./types/match";
 import "./App.css";
 import LandingPage from "./LandingPage";
+import { Brand } from "./components/Brand";
+import { ThemeToggle } from "./components/ThemeToggle";
+import { Pitch } from "./components/Pitch";
+import { EventIcon } from "./components/EventIcon";
 import {
   requestMatchInsight,
   type MatchEvidence,
@@ -255,114 +261,334 @@ useEffect(() => {
   const visibleEvents = frame.recentEvents.slice().reverse();
   const onSeek = (time: number) => setReplay((current) => seekReplay(current, match, time));
 
+  // Presentation-only derivations of the values above.
+  const durationSeconds = match.metadata.durationSeconds;
+  const progressPct = (100 * replay.elapsedSeconds) / durationSeconds;
+  const statusLabel = replay.status === "finished" ? "Full time" : isPlaying ? "Playing" : "Paused";
+  const fanFallback = !isAnalyst && modelDisplayStatus !== "ready";
+  const headline = fanFallback
+    ? latestMoment ? describeEvent(latestMoment) : "The match is about to begin"
+    : insight.headline;
+  const narrative = fanFallback
+    ? latestMoment
+      ? `${eventLabel(latestMoment)} are part of the latest action. Keep watching to see how the match develops.`
+      : "Press play to follow every pass, challenge, and change in momentum."
+    : insight.narrative;
+  const whyText = isAnalyst
+    ? insight.whyItMatters
+    : modelDisplayStatus === "ready" ? insight.whyItMatters : "Every update comes from events already shown in the replay.";
+  const sourceLabel = visibleAiInsight?.source === "foundry" ? "Microsoft Foundry" : visibleAiInsight?.source === "rule-based" ? "Rule based" : "Pending";
+  const shotMarks = match.events.filter(
+    (event): event is Extract<MatchEvent, { type: "shot" }> => event.type === "shot" && event.elapsedSeconds <= replay.elapsedSeconds,
+  );
+  const topProbability = visibleModel && prediction ? Math.max(...prediction.probabilities) : null;
+  const statRows: { label: string; left: number; right: number; unit?: string }[] = [
+    { label: "Shots", left: home.shots, right: away.shots },
+    { label: "Shots on target", left: home.shotsOnTarget, right: away.shotsOnTarget },
+    { label: "Pass accuracy", left: home.passCompletionPct, right: away.passCompletionPct, unit: "%" },
+    { label: "Tackles won", left: home.tacklesWon, right: away.tacklesWon },
+    ...(isAnalyst ? [
+      { label: "Pass attempts", left: home.passesAttempted, right: away.passesAttempted },
+      { label: "Completed passes", left: home.passesCompleted, right: away.passesCompleted },
+      { label: "Defensive pressures", left: home.pressuresApplied, right: away.pressuresApplied },
+    ] : []),
+  ];
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
   return (
-    <main className={`mw-app ${isAnalyst ? "mw-analyst" : "mw-fan"}`}>
-      <div className="mw-ambient mw-ambient-one" aria-hidden="true" />
-      <div className="mw-ambient mw-ambient-two" aria-hidden="true" />
-      <div className="mw-shell">
-        <header className="mw-topbar">
-          <a className="mw-brand" href="#/" aria-label="Matchwork, back to home">
-            <span className="mw-brand-icon" aria-hidden="true"><span /></span>
-            <span className="mw-brand-word">MATCHWORK<span className="mw-brand-period">.</span></span>
-          </a>
-          <div className="mw-topnav" aria-label="Dashboard sections">
-            <a href="#/">Home</a>
-            <button type="button" onClick={() => document.getElementById("insights")?.scrollIntoView({behavior:"smooth"})}>Insights</button>
-            <button type="button" onClick={() => document.getElementById("numbers")?.scrollIntoView({behavior:"smooth"})}>Statistics</button>
+    <div className={`studio ${isAnalyst ? "is-analyst" : "is-fan"}`}>
+      <header className="studio-bar">
+        <div className="studio-bar-inner">
+          <Brand href="#/" label="Matchwork, back to home" />
+          <nav className="studio-nav" aria-label="Dashboard sections">
+            <button type="button" onClick={() => scrollTo("match")}>Replay</button>
+            <button type="button" onClick={() => scrollTo("insights")}>Insight</button>
+            <button type="button" onClick={() => scrollTo("numbers")}>Statistics</button>
+          </nav>
+          <div className="studio-bar-end">
+            <span className="studio-data-note" title="All teams, players and events are fictional. No live Premier League data.">
+              <Info aria-hidden="true" /> Synthetic data
+            </span>
+            <ThemeToggle />
           </div>
-          <div className="mw-nav-end"><span className="mw-live-dot" aria-hidden="true" /><span>DEMO REPLAY</span><span className="mw-top-divider" /><span className="mw-demo-tag">SYNTHETIC DATA</span></div>
-        </header>
-
-        <div className="mw-content" id="match">
-          <div className="mw-pagehead mw-reveal">
-            <div>
-              
-              <h1>{isAnalyst ? "Analysis desk" : "Match center"}</h1>
-              <p>{isAnalyst ? "Evidence, timelines and match analysis." : "Follow the match your way."}</p>
-            </div>
-            <div className="mw-mode-switch" role="group" aria-label="Choose viewing experience">
-              <button type="button" className={!isAnalyst ? "mw-mode-active" : ""} aria-pressed={!isAnalyst} onClick={() => setAudience("fan")}><span aria-hidden="true">◉</span> Fan view</button>
-              <button type="button" className={isAnalyst ? "mw-mode-active" : ""} aria-pressed={isAnalyst} onClick={() => setAudience("analyst")}><span aria-hidden="true">▥</span> Analyst view</button>
-            </div>
-          </div>
-
-          <section className="mw-match-panel mw-reveal" aria-label="Match scoreboard and replay">
-            <div className="mw-match-top">
-              <span><span className="mw-live-dot" aria-hidden="true" /> MATCH REPLAY <span className="mw-separator">/</span> {match.metadata.title}</span>
-              <span className="mw-match-state">{replay.status === "finished" ? "FULL TIME" : isPlaying ? "● PLAYING" : "Ⅱ PAUSED"}</span>
-            </div>
-            <div className="mw-scoreboard">
-              <div className="mw-team mw-team-home"><div className="mw-crest mw-crest-home"><span>{homeTeam.abbreviation.slice(0,1)}</span></div><span className="mw-team-abbr">{homeTeam.abbreviation}</span><h2>{homeTeam.name}</h2><small>HOME</small></div>
-              <div className="mw-score-center"><div className="mw-score" aria-label={`${homeTeam.name} ${home.goals}, ${awayTeam.name} ${away.goals}`}><span className="mw-goal-number" key={`home-${home.goals}`}>{home.goals}</span><b className="mw-score-divider" aria-hidden="true">:</b><span className="mw-goal-number" key={`away-${away.goals}`}>{away.goals}</span></div><div className="mw-score-time"><span className="mw-clock-dot" aria-hidden="true" /> {formatClock(replay.elapsedSeconds)} <span>/ {formatClock(match.metadata.durationSeconds)}</span></div><span className="mw-match-round">DEMO MATCH</span></div>
-              <div className="mw-team mw-team-away"><div className="mw-crest mw-crest-away"><span>{awayTeam.abbreviation.slice(0,1)}</span></div><span className="mw-team-abbr">{awayTeam.abbreviation}</span><h2>{awayTeam.name}</h2><small>AWAY</small></div>
-            </div>
-
-            <div className="mw-replay-console">
-              <div className="mw-console-top"><span>THE MATCH TIMELINE</span><span className="mw-progress-percent">{Math.round(100 * replay.elapsedSeconds / match.metadata.durationSeconds)}% COMPLETE</span></div>
-              <div className="mw-range-shell">
-                <input id="match-progress" className="mw-slider" type="range" min={0} max={match.metadata.durationSeconds} step={1} value={replay.elapsedSeconds} aria-label="Seek match replay time" aria-valuetext={formatClock(replay.elapsedSeconds)} style={{background:`linear-gradient(90deg,#b8fa71 ${100 * replay.elapsedSeconds / match.metadata.durationSeconds}%,#34433b 0%)`}} onChange={(event) => onSeek(Number(event.target.value))} />
-              </div>
-              <div className="mw-time-marks"><span>00:00 / KICK OFF</span><span>45:00 / HALF TIME</span><span>90:00 / FULL TIME</span></div>
-              <div className="mw-control-row">
-                <div className="mw-play-controls">
-                  <button className="mw-play" type="button" disabled={replay.status === "finished"} aria-label={isPlaying ? "Pause match replay" : "Play match replay"} onClick={() => setReplay((current) => isPlaying ? pauseReplay(current) : playReplay(current, match))}><span aria-hidden="true">{isPlaying ? "Ⅱ" : "▶"}</span> {isPlaying ? "Pause replay" : "Play replay"}</button>
-                  <button className="mw-icon-button" type="button" aria-label="Restart match replay" title="Restart match replay" onClick={() => {setReplay((current) => restartReplay(current));setDismissedEventId(null);}}>↺</button>
-                  <span className="mw-control-divider" />
-                  <label className="mw-speed-label" htmlFor="replay-speed">SPEED <select id="replay-speed" value={replay.speed} onChange={(event) => setReplay((current) => setReplaySpeed(current, Number(event.target.value)))}><option value={1}>1×</option><option value={4}>4×</option><option value={16}>16×</option></select></label>
-                </div>
-                <span className="mw-console-note">{isPlaying ? "The story unfolds in real time" : "Drag the timeline to explore any moment"}</span>
-              </div>
-            </div>
-          </section>
-
-          <div className="mw-main-grid" id="insights">
-            <div className="mw-main-column">
-              <section className="mw-panel mw-intelligence mw-reveal" aria-label="Match intelligence">
-                <div className="mw-panel-heading"><div><span className="mw-panel-kicker">{isAnalyst ? "ANALYSIS DESK" : "YOUR MATCH STORY"}</span><h2>{isAnalyst ? "Match intelligence" : "What's happening?"}</h2></div><span className="mw-spark-symbol" aria-hidden="true">✳</span></div>
-                <div className="mw-insight-focus"><label htmlFor="focus-team">{isAnalyst ? "ANALYSIS TARGET" : "FOLLOW A TEAM"}</label><select id="focus-team" value={favoriteTeam} onChange={(event) => setFavoriteTeam(event.target.value as TeamId | "all")}><option value="all">Both teams</option><option value={homeTeam.id}>{homeTeam.name}</option><option value={awayTeam.id}>{awayTeam.name}</option></select></div>
-                {isAnalyst ? (
-                  <>
-                    <div className="mw-status-line"><span className={`mw-status-indicator mw-status-${modelDisplayStatus}`} /><span>{modelDisplayStatus === "ready" ? "ONNX inference available" : modelDisplayStatus === "loading" ? "ONNX inference pending" : "ONNX inference unavailable"}</span><span className="mw-status-detail">SYNTHETIC MODEL</span></div>
-                    <div className="mw-technical-times"><div><small>LIVE REPLAY TIME</small><strong>{formatClock(replay.elapsedSeconds)}</strong></div><div><small>MODEL SAMPLE AS OF</small><strong>{formatClock(modelSampleTime)}</strong></div><div><small>FEATURE WINDOW</small><strong>180s rolling</strong></div></div>
-                  </>
-                ) : <div className="mw-story-meta"><span className="mw-story-pulse" aria-hidden="true" /><span>{modelDisplayStatus === "ready" ? "MATCH MOMENT" : "LIVE MATCH EVENTS"}</span><span className="mw-story-meta-time">{formatClock(replay.elapsedSeconds)}</span></div>}
-                <div className="mw-headline-block" key={insight.headline}><h3>{!isAnalyst && modelDisplayStatus !== "ready" ? latestMoment ? describeEvent(latestMoment) : "The match is about to begin" : insight.headline}</h3><p>{!isAnalyst && modelDisplayStatus !== "ready" ? latestMoment ? `${eventLabel(latestMoment)} are part of the latest action. Keep watching to see how the match develops.` : "Press play to follow every pass, challenge, and change in momentum." : insight.narrative}</p></div>
-                <div className="mw-why"><span className="mw-why-icon" aria-hidden="true">↗</span><div><strong>{isAnalyst ? "INTERPRETATION" : "WHY IT MATTERS"}</strong><p>{isAnalyst ? insight.whyItMatters : modelDisplayStatus === "ready" ? insight.whyItMatters : "Every update comes from events already shown in the replay."}</p></div></div>
-                {isAnalyst && <>
-                  <div className="mw-model-readout"><div className="mw-readout-label">CLASSIFIER OUTPUT <small>NOT CALIBRATED PROBABILITIES</small></div>{visibleModel && prediction ? (["CONTROL","PRESSURE","TRANSITION"] as const).map((label,index)=><div className="mw-probability" key={label}><div><span>{label}</span><strong>{(prediction.probabilities[index]*100).toFixed(1)}%</strong></div><div className="mw-prob-track"><span style={{width:`${prediction.probabilities[index]*100}%`}} /></div></div>) : <p className="mw-muted-note">No validated ONNX result for this replay sample.</p>}</div>
-                  <details className="mw-evidence-details" open={detailsOpen} onToggle={(event)=>setDetailsOpen(event.currentTarget.open)}><summary>EVENT EVIDENCE &amp; MODEL DETAILS <span>↗</span></summary><div className="mw-evidence-list">{insight.evidence.map((datum)=><span key={datum}>{datum}</span>)}</div><div className="mw-evidence-ids"><strong>OBSERVED EVENT IDS</strong><p>{insight.evidenceEventIds.join(" · ") || "No events in this window"}</p></div><div className="mw-model-footer">Engine: Microsoft ONNX Runtime Web / WASM · Training: synthetic prototypes · Sample: 15s boundaries</div></details>
-                  {modelDisplayStatus === "unavailable" && <div className="mw-technical-error"><p>ONNX unavailable: {modelError}</p><button type="button" onClick={()=>setRetryCount((n)=>n+1)}>Retry classifier ↻</button></div>}
-                </>}
-                {!isAnalyst && <div className="mw-story-actions"><button type="button" className={insightTab==="story"?"mw-tab-selected":""} onClick={()=>setInsightTab("story")} aria-pressed={insightTab==="story"}>Match story</button><button type="button" className={insightTab==="recap"?"mw-tab-selected":""} onClick={()=>setInsightTab("recap")} aria-pressed={insightTab==="recap"}>Quick recap</button></div>}
-                {isAnalyst || insightTab==="recap" ? <div className="mw-narrative-box"><div><strong>{isAnalyst ? "GENERATED EXPLANATION" : "THE STORY SO FAR"}</strong>{isAnalyst && <span className="mw-source-pill">{visibleAiInsight?.source==="foundry"?"FOUNDRY": "RULE BASED"}</span>}</div><p>{isAnalyst ? visibleAiInsight?.explanation ?? (replay.status==="playing"?"Pause replay to request Foundry explanation.":recap) : recap}</p>{isAnalyst && <small>{visibleAiInsight?.source==="foundry"?"Microsoft Foundry response · backed by submitted observed event IDs":visibleAiInsight?.source==="rule-based"?"Foundry unavailable · deterministic fallback":"Only events up to the replay clock are used"}</small>}</div> : <div className="mw-narrative-box"><strong>THE MOMENT</strong><p>{visibleAiInsight?.explanation ?? (latestMoment ? describeEvent(latestMoment) : "Start the replay to discover the biggest moments.")}</p><small>{replay.status==="playing"?"Pause on a moment for a deeper match story":visibleAiInsight?.source==="foundry"?"Expanded story ready":"Showing the match story from observed events"}</small></div>}
-              </section>
-
-              {latestMoment && showMoment && <aside className="mw-moment-banner mw-reveal" aria-label="Latest match moment"><div className="mw-moment-mark" aria-hidden="true">↗</div><div className="mw-moment-copy"><small>LATEST MATCH MOMENT · {formatClock(latestMoment.elapsedSeconds)}</small><strong>{describeEvent(latestMoment)}</strong><span>{eventLabel(latestMoment)} / {isAnalyst ? `Event ${latestMoment.id} / ${latestMoment.playerId}` : "Action from the pitch"}</span></div><button className="mw-moment-dismiss" type="button" onClick={()=>setDismissedEventId(latestMoment.id)} aria-label="Dismiss match moment">×</button></aside>}
-            </div>
-
-            <div className="mw-side-column">
-              <section className="mw-panel mw-pitch-panel mw-reveal" aria-label="Observed event location on pitch"><div className="mw-panel-heading"><div><span className="mw-panel-kicker">FROM THE PITCH</span><h2>{isAnalyst ? "Observed event position" : "Where the action is"}</h2></div><span className="mw-panel-icon" aria-hidden="true">⌖</span></div>
-                <div className="mw-pitch-shell"><svg viewBox="0 0 320 206" role="img" aria-label={latestMoment ? `Latest observed event location, ${Math.round(latestMoment.x)} percent along and ${Math.round(latestMoment.y)} percent across the pitch` : "Pitch visualization awaiting the first event"}>
-                  <rect x="1" y="1" width="318" height="204" rx="7" fill="#112c27" stroke="#51786d" strokeWidth="1.5" />
-                  <g stroke="#51786d" strokeWidth="1.3" fill="none"><path d="M160 1V205 M1 1H319V205H1Z"/><circle cx="160" cy="103" r="29"/><circle cx="160" cy="103" r="2" fill="#51786d"/><path d="M1 45H51V161H1 M319 45H269V161H319 M1 77H20V129H1 M319 77H300V129H319"/><path d="M63 72A34 34 0 0 1 63 134 M257 72A34 34 0 0 0 257 134"/></g>
-                  {frame.recentEvents.slice(-5).map((event,index)=><circle key={event.id} cx={10+event.x*3} cy={10+event.y*1.86} r={index===Math.min(5,frame.recentEvents.length)-1 ? 8 : 4} fill={event.teamId===homeTeam.id?"#75b4ff":"#ff877e"} opacity={index===Math.min(5,frame.recentEvents.length)-1 ? 1 : 0.38} stroke="#eaf4f2" strokeWidth={index===Math.min(5,frame.recentEvents.length)-1?2:0}/>)}
-                </svg><div className="mw-pitch-overlay"><span className="mw-live-dot" /> EVENT COORDINATES / SYNTHETIC</div></div>
-                <div className="mw-pitch-legend"><span><i className="mw-legend-dot mw-legend-home" />{homeTeam.abbreviation}</span><span><i className="mw-legend-dot mw-legend-away" />{awayTeam.abbreviation}</span></div>
-                <p className="mw-pitch-footnote">{latestMoment ? `${formatClock(latestMoment.elapsedSeconds)} · ${describeEvent(latestMoment)}` : "Start the replay to see where recorded match events occur."}</p>
-              </section>
-
-              <section className="mw-panel mw-feed-panel mw-reveal" aria-label="Recent match events"><div className="mw-panel-heading"><div><span className="mw-panel-kicker">PLAY BY PLAY</span><h2>{isAnalyst?"Observed event stream":"Latest action"}</h2></div><span className="mw-feed-count">{frame.stats.processedEvents} EVENTS</span></div><div className="mw-feed">{visibleEvents.length===0?<p className="mw-empty">The opening whistle is coming. Press play to begin.</p>:visibleEvents.map((event,index)=><div className="mw-event" key={event.id}><div className="mw-event-rail"><span className={`mw-event-symbol mw-event-${event.type}`}>{event.type==="shot"?"◎":event.type==="pass"?"↗":event.type==="tackle"?"✕":event.type==="pressure"?"≋":"↔"}</span>{index<visibleEvents.length-1&&<span className="mw-event-link"/>}</div><div className="mw-event-detail"><div><strong>{describeEvent(event)}</strong><time>{formatClock(event.elapsedSeconds)}</time></div><small>{eventLabel(event)} · {isAnalyst?`${event.playerId} · ${event.id}`:"Match event"}</small></div></div>)}</div></section>
-            </div>
-          </div>
-
-          <section className="mw-panel mw-stats-panel mw-reveal" id="numbers" aria-label="Match statistics"><div className="mw-panel-heading"><div><span className="mw-panel-kicker">MATCH STATS</span><h2>{isAnalyst?"Live match statistics":"Match at a glance"}</h2></div><span className="mw-section-time">{formatClock(replay.elapsedSeconds)}</span></div>
-            <div className="mw-possession"><div className="mw-possession-heading"><span><i className="mw-legend-dot mw-legend-home" />{homeTeam.abbreviation} <strong>{home.possessionPct}%</strong></span><span>POSSESSION</span><span><strong>{away.possessionPct}%</strong> {awayTeam.abbreviation}<i className="mw-legend-dot mw-legend-away" /></span></div><div className="mw-possession-track"><span style={{width:`${homeShare}%`}} /></div></div>
-            <div className="mw-stat-grid">{([{label:"Shots",left:home.shots,right:away.shots},{label:"Shots on target",left:home.shotsOnTarget,right:away.shotsOnTarget},{label:"Pass accuracy",left:`${home.passCompletionPct}%`,right:`${away.passCompletionPct}%`},{label:"Tackles won",left:home.tacklesWon,right:away.tacklesWon},...(isAnalyst?[{label:"Pass attempts",left:home.passesAttempted,right:away.passesAttempted},{label:"Completed passes",left:home.passesCompleted,right:away.passesCompleted},{label:"Defensive pressures",left:home.pressuresApplied,right:away.pressuresApplied}]:[])]).map((stat)=><div className="mw-stat" key={stat.label}><strong>{stat.left}</strong><span>{stat.label}</span><strong>{stat.right}</strong></div>)}</div>
-          </section>
-          <footer className="mw-footer"><span>© MATCHWORK / THE GAME, UNDERSTOOD.</span><span>Synthetic football events and training labels · Not live Premier League data or real-world model accuracy</span></footer>
         </div>
-      </div>
-    </main>
+      </header>
+
+      <main className="studio-main" id="match">
+        <div className="studio-head">
+          <div>
+            <h1>{isAnalyst ? "Analysis desk" : "Match center"}</h1>
+            <p>{isAnalyst ? "Evidence, timelines and match analysis." : "Follow the match your way."}</p>
+          </div>
+          <div className="segmented" role="group" aria-label="Choose viewing experience">
+            <button type="button" aria-pressed={!isAnalyst} onClick={() => setAudience("fan")}><Users aria-hidden="true" /> Fan view</button>
+            <button type="button" aria-pressed={isAnalyst} onClick={() => setAudience("analyst")}><ChartColumn aria-hidden="true" /> Analyst view</button>
+          </div>
+        </div>
+
+        <section className="card scoreboard" aria-label="Match scoreboard and replay">
+          <div className="scoreboard-top">
+            <span className="scoreboard-title">{match.metadata.title}</span>
+            <span className={`status-chip is-${replay.status}`}><span className="status-dot" aria-hidden="true" />{statusLabel}</span>
+          </div>
+
+          <div className="scoreline">
+            <div className="team team-home">
+              <span className="crest is-home" aria-hidden="true">{homeTeam.abbreviation}</span>
+              <div><h2>{homeTeam.name}</h2><small>Home</small></div>
+            </div>
+            <div className="score-center">
+              <div className="score tabular" aria-label={`${homeTeam.name} ${home.goals}, ${awayTeam.name} ${away.goals}`}>
+                <span key={`home-${home.goals}`}>{home.goals}</span>
+                <span className="score-sep" aria-hidden="true">–</span>
+                <span key={`away-${away.goals}`}>{away.goals}</span>
+              </div>
+              <div className="score-clock tabular">{formatClock(replay.elapsedSeconds)} <span>/ {formatClock(durationSeconds)}</span></div>
+            </div>
+            <div className="team team-away">
+              <div><h2>{awayTeam.name}</h2><small>Away</small></div>
+              <span className="crest is-away" aria-hidden="true">{awayTeam.abbreviation}</span>
+            </div>
+          </div>
+
+          <div className="timeline">
+            <div className="timeline-marks">
+              <span className="timeline-half" style={{ left: "50%" }} aria-hidden="true" />
+              {shotMarks.map((shot) => {
+                const left = `${(100 * shot.elapsedSeconds) / durationSeconds}%`;
+                const team = shot.teamId === homeTeam.id ? "is-home" : "is-away";
+                return shot.outcome === "goal" ? (
+                  <button key={shot.id} type="button" className={`timeline-goal ${team}`} style={{ left }} onClick={() => onSeek(shot.elapsedSeconds)}
+                    aria-label={`Goal, ${eventLabel(shot)} at ${formatClock(shot.elapsedSeconds)}. Jump to this moment`} title={`Goal, ${eventLabel(shot)} ${formatClock(shot.elapsedSeconds)}`} />
+                ) : (
+                  <span key={shot.id} className={`timeline-shot ${team}`} style={{ left }} aria-hidden="true" />
+                );
+              })}
+            </div>
+            <input id="match-progress" className="timeline-range" type="range" min={0} max={durationSeconds} step={1} value={replay.elapsedSeconds}
+              aria-label="Seek match replay time" aria-valuetext={formatClock(replay.elapsedSeconds)}
+              style={{ "--progress": `${progressPct}%` } as CSSProperties}
+              onChange={(event) => onSeek(Number(event.target.value))} />
+            <div className="timeline-labels tabular"><span>Kick-off</span><span>Half-time 45:00</span><span>Full time</span></div>
+          </div>
+
+          <div className="controls">
+            <div className="controls-main">
+              <button className="btn btn-primary play-btn" type="button" disabled={replay.status === "finished"} aria-label={isPlaying ? "Pause match replay" : "Play match replay"}
+                onClick={() => setReplay((current) => isPlaying ? pauseReplay(current) : playReplay(current, match))}>
+                {isPlaying ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />} {isPlaying ? "Pause" : "Play"}
+              </button>
+              <button className="icon-btn icon-btn-outline" type="button" aria-label="Restart match replay" title="Restart match replay"
+                onClick={() => { setReplay((current) => restartReplay(current)); setDismissedEventId(null); }}>
+                <RotateCcw aria-hidden="true" />
+              </button>
+              <div className="segmented segmented-sm" role="group" aria-label="Replay speed">
+                {REPLAY_SPEEDS.map((speed) => (
+                  <button key={speed} type="button" aria-pressed={replay.speed === speed} onClick={() => setReplay((current) => setReplaySpeed(current, speed))}>{speed}×</button>
+                ))}
+              </div>
+            </div>
+            <span className="controls-note">
+              {isPlaying ? "The story unfolds in real time." : "Drag the timeline or pick a goal marker to explore any moment."}
+              <span className="tabular"> {Math.round(progressPct)}% played</span>
+            </span>
+          </div>
+        </section>
+
+        <div className="studio-grid" id="insights">
+          <div className="studio-col">
+            <section className="card insight" aria-label="Match intelligence">
+              <div className="insight-head">
+                <div>
+                  <span className="eyebrow">{isAnalyst ? "Analysis" : "Your match story"} · <span className="tabular">{formatClock(replay.elapsedSeconds)}</span></span>
+                  <h2>{isAnalyst ? "Match intelligence" : "What's happening?"}</h2>
+                </div>
+                <label className="field" htmlFor="focus-team">
+                  <span>{isAnalyst ? "Analysis target" : "Follow a team"}</span>
+                  <span className="select-wrap">
+                    <select id="focus-team" value={favoriteTeam} onChange={(event) => setFavoriteTeam(event.target.value as TeamId | "all")}>
+                      <option value="all">Both teams</option>
+                      <option value={homeTeam.id}>{homeTeam.name}</option>
+                      <option value={awayTeam.id}>{awayTeam.name}</option>
+                    </select>
+                    <ChevronDown aria-hidden="true" />
+                  </span>
+                </label>
+              </div>
+
+              {isAnalyst && (
+                <div className="model-strip">
+                  <span className={`model-status is-${modelDisplayStatus}`}>
+                    <span className="status-dot" aria-hidden="true" />
+                    {modelDisplayStatus === "ready" ? "ONNX inference available" : modelDisplayStatus === "loading" ? "ONNX inference pending" : "ONNX inference unavailable"}
+                  </span>
+                  <dl className="model-times tabular">
+                    <div><dt>Replay time</dt><dd>{formatClock(replay.elapsedSeconds)}</dd></div>
+                    <div><dt>Model sample</dt><dd>{formatClock(modelSampleTime)}</dd></div>
+                    <div><dt>Feature window</dt><dd>180s rolling</dd></div>
+                  </dl>
+                </div>
+              )}
+
+              <div className="insight-lead" key={headline}>
+                <h3>{headline}</h3>
+                <p>{narrative}</p>
+              </div>
+
+              <div className="insight-why">
+                <span className="label">{isAnalyst ? "Interpretation" : "Why it matters"}</span>
+                <p>{whyText}</p>
+              </div>
+
+              {isAnalyst && (
+                <div className="classifier">
+                  <div className="classifier-head"><span className="label">Classifier output</span><small>Not calibrated probabilities</small></div>
+                  {visibleModel && prediction ? (["CONTROL", "PRESSURE", "TRANSITION"] as const).map((label, index) => {
+                    const value = prediction.probabilities[index];
+                    return (
+                      <div className={`prob${value === topProbability ? " is-top" : ""}`} key={label}>
+                        <span className="prob-label">{label.charAt(0) + label.slice(1).toLowerCase()}</span>
+                        <span className="prob-track"><span style={{ width: `${value * 100}%` }} /></span>
+                        <strong className="tabular">{(value * 100).toFixed(1)}%</strong>
+                      </div>
+                    );
+                  }) : <p className="muted">No validated ONNX result for this replay sample.</p>}
+                </div>
+              )}
+
+              {isAnalyst && (
+                <details className="evidence" open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
+                  <summary><span>Event evidence and model details</span><ChevronDown aria-hidden="true" /></summary>
+                  <ul className="evidence-list">{insight.evidence.map((datum) => <li key={datum}>{datum}</li>)}</ul>
+                  <div className="evidence-ids">
+                    <span className="label">Observed event IDs</span>
+                    <p>{insight.evidenceEventIds.length ? insight.evidenceEventIds.map((id) => <code key={id}>{id}</code>) : "No events in this window"}</p>
+                  </div>
+                  <p className="evidence-foot">Engine: Microsoft ONNX Runtime Web (WASM) · Training: synthetic prototypes · Sample: 15s boundaries</p>
+                </details>
+              )}
+
+              {isAnalyst && modelDisplayStatus === "unavailable" && (
+                <div className="alert" role="status">
+                  <CircleAlert aria-hidden="true" />
+                  <p>ONNX unavailable: {modelError}</p>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setRetryCount((n) => n + 1)}><RefreshCw aria-hidden="true" /> Retry classifier</button>
+                </div>
+              )}
+
+              {!isAnalyst && (
+                <div className="tabs" role="group" aria-label="Story format">
+                  <button type="button" aria-pressed={insightTab === "story"} onClick={() => setInsightTab("story")}>Match story</button>
+                  <button type="button" aria-pressed={insightTab === "recap"} onClick={() => setInsightTab("recap")}>Quick recap</button>
+                </div>
+              )}
+
+              {isAnalyst || insightTab === "recap" ? (
+                <div className="narrative">
+                  <div className="narrative-head">
+                    <span className="label">{isAnalyst ? "Generated explanation" : "The story so far"}</span>
+                    {isAnalyst && <span className={`source-tag is-${visibleAiInsight?.source ?? "pending"}`}>{sourceLabel}</span>}
+                  </div>
+                  <p>{isAnalyst ? visibleAiInsight?.explanation ?? (replay.status === "playing" ? "Pause replay to request Foundry explanation." : recap) : recap}</p>
+                  {isAnalyst && <small>{visibleAiInsight?.source === "foundry" ? "Microsoft Foundry response · backed by submitted observed event IDs" : visibleAiInsight?.source === "rule-based" ? "Foundry unavailable · deterministic fallback" : "Only events up to the replay clock are used"}</small>}
+                </div>
+              ) : (
+                <div className="narrative">
+                  <div className="narrative-head"><span className="label">The moment</span></div>
+                  <p>{visibleAiInsight?.explanation ?? (latestMoment ? describeEvent(latestMoment) : "Start the replay to discover the biggest moments.")}</p>
+                  <small>{replay.status === "playing" ? "Pause on a moment for a deeper match story" : visibleAiInsight?.source === "foundry" ? "Expanded story ready" : "Showing the match story from observed events"}</small>
+                </div>
+              )}
+            </section>
+
+            {latestMoment && showMoment && (
+              <aside className="moment" aria-label="Latest match moment">
+                <span className={`event-icon is-${latestMoment.teamId === homeTeam.id ? "home" : "away"}`}><EventIcon type={latestMoment.type} /></span>
+                <div className="moment-copy">
+                  <small className="tabular">Latest moment · {formatClock(latestMoment.elapsedSeconds)}</small>
+                  <strong>{describeEvent(latestMoment)}</strong>
+                  <span>{eventLabel(latestMoment)} · {isAnalyst ? `Event ${latestMoment.id} · ${latestMoment.playerId}` : "Action from the pitch"}</span>
+                </div>
+                <button className="icon-btn" type="button" onClick={() => setDismissedEventId(latestMoment.id)} aria-label="Dismiss match moment"><X aria-hidden="true" /></button>
+              </aside>
+            )}
+          </div>
+
+          <div className="studio-col studio-side">
+            <section className="card" aria-label="Observed event location on pitch">
+              <div className="card-head">
+                <div><span className="eyebrow">From the pitch</span><h2>{isAnalyst ? "Observed event position" : "Where the action is"}</h2></div>
+                <div className="legend"><span><i className="legend-dot is-home" />{homeTeam.abbreviation}</span><span><i className="legend-dot is-away" />{awayTeam.abbreviation}</span></div>
+              </div>
+              <div className="pitch-frame">
+                <Pitch events={frame.recentEvents.slice(-5)} homeId={homeTeam.id}
+                  label={latestMoment ? `Latest observed event location, ${Math.round(latestMoment.x)} percent along and ${Math.round(latestMoment.y)} percent across the pitch` : "Pitch visualization awaiting the first event"} />
+              </div>
+              <p className="card-foot tabular">{latestMoment ? `${formatClock(latestMoment.elapsedSeconds)} · ${describeEvent(latestMoment)}` : "Start the replay to see where recorded match events occur."}</p>
+            </section>
+
+            <section className="card feed-card" aria-label="Recent match events">
+              <div className="card-head">
+                <div><span className="eyebrow">Play by play</span><h2>{isAnalyst ? "Observed event stream" : "Latest action"}</h2></div>
+                <span className="count tabular">{frame.stats.processedEvents} events</span>
+              </div>
+              {visibleEvents.length === 0 ? (
+                <p className="empty">The opening whistle is coming. Press play to begin.</p>
+              ) : (
+                <ol className="feed">
+                  {visibleEvents.map((event) => (
+                    <li key={event.id}>
+                      <span className={`event-icon is-${event.teamId === homeTeam.id ? "home" : "away"}`}><EventIcon type={event.type} /></span>
+                      <div className="feed-body">
+                        <strong>{describeEvent(event)}</strong>
+                        <small>{eventLabel(event)} · {isAnalyst ? `${event.playerId} · ${event.id}` : "Match event"}</small>
+                      </div>
+                      <time className="tabular">{formatClock(event.elapsedSeconds)}</time>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          </div>
+        </div>
+
+        <section className="card stats" id="numbers" aria-label="Match statistics">
+          <div className="card-head">
+            <div><span className="eyebrow">Match stats</span><h2>{isAnalyst ? "Live match statistics" : "Match at a glance"}</h2></div>
+            <span className="count tabular">As of {formatClock(replay.elapsedSeconds)}</span>
+          </div>
+          <div className="possession">
+            <div className="possession-row tabular">
+              <span><i className="legend-dot is-home" />{homeTeam.abbreviation} <strong>{home.possessionPct}%</strong></span>
+              <span className="label">Possession</span>
+              <span><strong>{away.possessionPct}%</strong> {awayTeam.abbreviation}<i className="legend-dot is-away" /></span>
+            </div>
+            <div className="split-bar is-lg"><span className="is-home" style={{ width: `${homeShare}%` }} /><span className="is-away" /></div>
+          </div>
+          <div className="stat-grid">
+            {statRows.map((stat) => {
+              const total = stat.left + stat.right;
+              const share = total === 0 ? 50 : (100 * stat.left) / total;
+              return (
+                <div className="stat" key={stat.label}>
+                  <div className="stat-row tabular">
+                    <strong className={stat.left > stat.right ? "is-lead" : ""}>{stat.left}{stat.unit}</strong>
+                    <span>{stat.label}</span>
+                    <strong className={stat.right > stat.left ? "is-lead" : ""}>{stat.right}{stat.unit}</strong>
+                  </div>
+                  <div className="split-bar"><span className="is-home" style={{ width: `${share}%` }} /><span className="is-away" /></div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <footer className="studio-footer">
+          <span>Matchwork. The game, understood.</span>
+          <span>Synthetic football events and training labels. Not live Premier League data or real-world model accuracy.</span>
+        </footer>
+      </main>
+    </div>
   );
 }
 
