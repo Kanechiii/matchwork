@@ -26,7 +26,8 @@ global across staging replicas that share the prefix.
 
 This implementation deliberately does NOT introduce Redis infrastructure
 or deploy any new image to Azure. Both staging and production stay on
-their existing images and settings, with paid inference disabled.
+their existing images and settings. Staging remains disabled; production
+retains its previously configured single-agent AI settings.
 Before enabling paid traffic: provision persistent managed Redis with TLS,
 set a dedicated restricted Redis credential in staging only, set a very
 small global attempt limit, configure network access and persistence,
