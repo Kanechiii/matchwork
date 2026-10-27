@@ -293,7 +293,7 @@ useEffect(() => {
             </div>
             <div className="mw-scoreboard">
               <div className="mw-team mw-team-home"><div className="mw-crest mw-crest-home"><span>{homeTeam.abbreviation.slice(0,1)}</span></div><span className="mw-team-abbr">{homeTeam.abbreviation}</span><h2>{homeTeam.name}</h2><small>HOME</small></div>
-              <div className="mw-score-center"><div className="mw-score" aria-label={`${homeTeam.name} ${home.goals}, ${awayTeam.name} ${away.goals}`}><span key={home.goals}>{home.goals}</span><b>:</b><span key={away.goals}>{away.goals}</span></div><div className="mw-score-time"><span className="mw-clock-dot" aria-hidden="true" /> {formatClock(replay.elapsedSeconds)} <span>/ {formatClock(match.metadata.durationSeconds)}</span></div><span className="mw-match-round">DEMO MATCH</span></div>
+              <div className="mw-score-center"><div className="mw-score" aria-label={`${homeTeam.name} ${home.goals}, ${awayTeam.name} ${away.goals}`}><span className="mw-goal-number" key={`home-${home.goals}`}>{home.goals}</span><b className="mw-score-divider" aria-hidden="true">:</b><span className="mw-goal-number" key={`away-${away.goals}`}>{away.goals}</span></div><div className="mw-score-time"><span className="mw-clock-dot" aria-hidden="true" /> {formatClock(replay.elapsedSeconds)} <span>/ {formatClock(match.metadata.durationSeconds)}</span></div><span className="mw-match-round">DEMO MATCH</span></div>
               <div className="mw-team mw-team-away"><div className="mw-crest mw-crest-away"><span>{awayTeam.abbreviation.slice(0,1)}</span></div><span className="mw-team-abbr">{awayTeam.abbreviation}</span><h2>{awayTeam.name}</h2><small>AWAY</small></div>
             </div>
 
