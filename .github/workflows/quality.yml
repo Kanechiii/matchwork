@@ -49,6 +49,9 @@ jobs:
           AZURE_OPENAI_DEPLOYMENT=ci-model \
           python3 -m backend.diagnose_agents
 
+      - name: Evaluate agent evidence and resilience without Azure calls
+        run: python3 -m backend.evaluate_agents
+
       - name: Production build
         run: npm run build
 
