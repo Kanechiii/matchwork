@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { SyntheticMatch } from "./types/match";
 import "./LandingPage.css";
 
@@ -34,6 +35,23 @@ function PitchPreview({ match }: LandingPageProps) {
 }
 
 function LandingPage({ match }: LandingPageProps) {
+  useEffect(() => {
+    const sections = document.querySelectorAll<HTMLElement>(".lp-reveal");
+    if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      sections.forEach((section) => section.classList.add("lp-visible"));
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("lp-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: "0px 0px -35px 0px" });
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
   return (
     <main className="lp-page">
       <a className="lp-skip" href="#lp-story">Skip to the story</a>
@@ -54,13 +72,13 @@ function LandingPage({ match }: LandingPageProps) {
         <PitchPreview match={match}/>
       </section>
 
-      <section className="lp-intro" id="lp-story">
+      <section className="lp-intro lp-reveal" id="lp-story">
         <div className="lp-section-number">01 / THE BIGGER PICTURE</div>
         <div><p className="lp-intro-super">More than a scoreline.</p><h2>The moments between the goals <em>are the game.</em></h2></div>
         <p>A completed pass. A sudden turnover. Pressure building toward the box. Matchwork brings those small moments into focus—so you can see the match take shape.</p>
       </section>
 
-      <section className="lp-feature lp-feature-one" id="lp-how">
+      <section className="lp-feature lp-feature-one lp-reveal" id="lp-how">
         <div className="lp-feature-copy"><span className="lp-chapter">02 / FOLLOW THE ACTION</span><h2>Rewind a moment.<br/><em>Find the meaning.</em></h2><p>Move through a 90-minute match, pause wherever you like, and watch the story and statistics follow your position. It's the match on your terms.</p><a href="#/studio" className="lp-inline-cta">Try the replay <span aria-hidden="true">↗</span></a></div>
         <div className="lp-showcase lp-timeline-showcase" aria-label="Illustration of the replay timeline">
           <div className="lp-showcase-top"><span>THE MATCH IS IN YOUR HANDS</span><span className="lp-showcase-tag">REPLAY</span></div>
@@ -72,7 +90,7 @@ function LandingPage({ match }: LandingPageProps) {
         </div>
       </section>
 
-      <section className="lp-feature lp-feature-two" id="lp-views">
+      <section className="lp-feature lp-feature-two lp-reveal" id="lp-views">
         <div className="lp-view-showcase">
           <div className="lp-view-card lp-view-card-fan"><span className="lp-view-label">FOR THE FAN</span><span className="lp-view-icon">✳</span><h3>What's happening?</h3><p>Pressure is rising. The action is moving forward.</p><div className="lp-view-bottom">THE STORY, MADE SIMPLE <span>↗</span></div></div>
           <div className="lp-view-card lp-view-card-analyst"><span className="lp-view-label">FOR THE ANALYST</span><div className="lp-mini-bars"><span style={{width:"74%"}}/><span style={{width:"46%"}}/><span style={{width:"61%"}}/></div><h3>Show me the evidence.</h3><p>Event timing, match statistics, and transparent model details.</p><div className="lp-view-bottom">THE DETAIL BEHIND THE PLAY <span>↗</span></div></div>
@@ -80,7 +98,7 @@ function LandingPage({ match }: LandingPageProps) {
         <div className="lp-feature-copy"><span className="lp-chapter">03 / YOUR WAY INTO THE GAME</span><h2>Curious fan?<br/><em>Deep thinker?</em><br/>There's a view for you.</h2><p>Fan view keeps the game human. Analyst view opens up the evidence behind the insights. Switch whenever you want—without losing your place.</p><a href="#/studio" className="lp-inline-cta">Find your view <span aria-hidden="true">↗</span></a></div>
       </section>
 
-      <section className="lp-close">
+      <section className="lp-close lp-reveal">
         <div className="lp-close-grid" aria-hidden="true"/>
         <span className="lp-chapter">READY TO SEE THE GAME DIFFERENTLY?</span>
         <h2>Don't just watch<br/><em>the game.</em> Read it.</h2>
