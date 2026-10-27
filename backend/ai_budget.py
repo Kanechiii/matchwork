@@ -12,6 +12,8 @@ from threading import Lock
 from time import monotonic
 from typing import Callable
 
+from .shared_budget import from_environment as shared_from_environment, SharedAttemptLedgerUnavailable
+
 
 class FoundryBudget:
     """Atomically bound the number of paid Foundry attempts per Python process."""
@@ -23,6 +25,7 @@ class FoundryBudget:
         hourly_limit: int = 20,
         daily_limit: int = 50,
         concurrent_limit: int = 1,
+        shared_ledger = None,
         clock: Callable[[], float] = monotonic,
         utcnow: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
@@ -30,6 +33,7 @@ class FoundryBudget:
         self.hourly_limit = max(0, hourly_limit)
         self.daily_limit = max(0, daily_limit)
         self.concurrent_limit = max(0, concurrent_limit)
+        self._shared_ledger = shared_ledger
         self._clock = clock
         self._utcnow = utcnow
         self._lock = Lock()
@@ -53,6 +57,8 @@ class FoundryBudget:
             hourly_limit=limit("MATCHWORK_AI_MAX_CALLS_PER_HOUR", 20),
             daily_limit=limit("MATCHWORK_AI_MAX_CALLS_PER_DAY", 50),
             concurrent_limit=1,
+            # Inference from environment must fail closed without a shared ledger.
+            shared_ledger=shared_from_environment() or SharedAttemptLedgerUnavailable(),
         )
 
     def acquire(self) -> str | None:
@@ -76,6 +82,11 @@ class FoundryBudget:
                 return "ai_hourly_limited"
             if self._day_attempts >= self.daily_limit:
                 return "ai_daily_limited"
+
+            if self._shared_ledger is not None:
+                refusal = self._shared_ledger.reserve(self.hourly_limit, self.daily_limit)
+                if refusal is not None:
+                    return refusal
 
             # Count attempts, even if Foundry returns an error, to avoid retries
             # consuming unbounded traffic during an outage.
