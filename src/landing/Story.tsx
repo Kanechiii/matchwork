@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView, useMotionValueEvent, useScroll, useTransform } from "motion/react";
 import type { MatchEvent, SyntheticMatch } from "../types/match";
 import { EventIcon } from "../components/EventIcon";
-import { Pitch } from "../components/Pitch";
+import { ActivityStrip } from "./ActivityStrip";
 import { EASE_OUT, SPRING_BAR, STAGGER, swap } from "../motion";
-import { clock, frameAt, type SampleModel, type useSampleMoment } from "./sample";
+import { clock, frameAt, useMinuteBins, type SampleModel, type useSampleMoment } from "./sample";
 
 type Sample = ReturnType<typeof useSampleMoment>;
 
 const STEPS = [
-  { kicker: "Events", title: "It starts with 1,200 events.", body: "A seeded generator writes a complete fictional match: passes, shots, tackles, pressure and turnovers, each with a timestamp and a position on the pitch. The same seed always produces the same match, so every demo is reproducible." },
+  { kicker: "Events", title: "It starts with 1,200 events.", body: "Every match is broken into passes, shots, tackles, pressure and turnovers, each with a timestamp, a side and a position on the pitch. The demo fixture comes from a seeded generator, so it reproduces exactly every time." },
   { kicker: "Replay clock", title: "Only the past is known.", body: "Score, statistics and explanations are computed only from events at or before the replay clock. Scroll and the match unfolds. Nothing from later in the game leaks into what you see." },
   { kicker: "Rolling window", title: "Three minutes reveal the rhythm.", body: "The latest three minutes are summarised into seven features: pass completion, pressure, turnovers, shots, tempo, attacking territory and score tension." },
   { kicker: "In-browser model", title: "A model names the spell.", body: "Microsoft ONNX Runtime Web runs a small classifier right in your browser and labels the window as control, pressure or transition. It is trained on synthetic prototypes, so its scores are illustrative, not calibrated predictions." },
@@ -152,10 +152,9 @@ export function Story({ match, sample, model }: { match: SyntheticMatch; sample:
   useEffect(() => { if (step >= 2) request(); }, [step, request]);
 
   const frame = useMemo(() => frameAt(match, time), [match, time]);
-  const trail = useMemo(() => match.events.slice(0, frame.stats.processedEvents), [match, frame.stats.processedEvents]);
+  const strip = useMinuteBins(match);
   const windowView = step >= 2;
-  const homeTeam = match.metadata.homeTeam;
-  const awayTeam = match.metadata.awayTeam;
+  const shownTime = windowView ? sample.time : time;
 
   const goTo = (i: number) => document.getElementById(`story-${i + 1}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
 
@@ -163,7 +162,7 @@ export function Story({ match, sample, model }: { match: SyntheticMatch; sample:
     <section className="lp-story" id="story" ref={ref} aria-labelledby="story-title">
       <div className="lp-story-intro">
         <h2 id="story-title">How a moment becomes an insight.</h2>
-        <p>Scroll through one real moment of the fictional match, from raw events to an explanation you can check.</p>
+        <p>Scroll through one moment of the demo fixture, from raw events to an explanation you can check. The same pipeline applies to any team and any match.</p>
       </div>
       <div className="lp-story-grid">
         <div className="lp-steps">
@@ -173,18 +172,21 @@ export function Story({ match, sample, model }: { match: SyntheticMatch; sample:
         <div className="lp-stage-wrap">
           <div className="lp-stage">
             <div className="lp-stage-head">
-              <span className="lp-team"><i className="lp-chip is-home">{homeTeam.abbreviation}</i></span>
+              <span className="lp-side is-home">Home</span>
               <strong className="tabular">{frame.stats.home.goals}–{frame.stats.away.goals}</strong>
-              <span className="lp-team"><i className="lp-chip is-away">{awayTeam.abbreviation}</i></span>
-              <span className="lp-stage-clock tabular">{clock(windowView ? sample.time : time)}</span>
+              <span className="lp-side is-away">Away</span>
+              <span className="lp-stage-clock tabular">{clock(shownTime)}</span>
             </div>
-            <div className="lp-stage-pitch">
-              <Pitch
-                events={windowView ? sample.windowEvents : frame.recentEvents}
-                trail={windowView ? sample.trail : trail}
-                homeId={homeTeam.id}
-                label={windowView ? "Events in the three-minute window, highlighted over the match so far" : "Event positions so far"}
-              />
+            <div className="lp-stage-strip">
+              <div className="lp-stage-strip-head">
+                <span>Events per minute</span>
+                <span className="lp-strip-legend"><i className="is-home" /> Home <i className="is-away" /> Away</span>
+              </div>
+              <ActivityStrip tall bins={strip.bins} max={strip.max} goals={strip.goals} homeId={match.metadata.homeTeam.id}
+                duration={match.metadata.durationSeconds} time={shownTime}
+                window={windowView ? [sample.features.startSeconds, sample.features.endSeconds] : undefined}
+                label={windowView ? "Events per minute, with the three-minute feature window highlighted" : `Events per minute up to ${clock(shownTime)}`} />
+              <div className="lp-stage-strip-foot tabular"><span>00:00</span><span>45:00</span><span>90:00</span></div>
             </div>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div key={step} {...swap}>

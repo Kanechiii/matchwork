@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { SyntheticMatch } from "../types/match";
+import type { MatchEvent, SyntheticMatch } from "../types/match";
 import { createReplayState, getReplayFrame, seekReplay } from "../engine/replay";
 import { extractWindowFeatures, type WindowFeatures } from "../ai/features";
 import { buildMatchRecap } from "../ai/explanations";
@@ -26,7 +26,7 @@ export function useSampleMoment(match: SyntheticMatch) {
       time,
       frame: frameAt(match, time),
       features,
-      recap: buildMatchRecap(match, time),
+      recap: neutralRecap(match, time),
       windowEvents: match.events.filter((e) => ids.has(e.id)),
       trail: match.events.filter((e) => e.elapsedSeconds <= time),
     };
@@ -55,4 +55,63 @@ export function useSampleModel(features: WindowFeatures) {
   }, [state.status, features]);
 
   return { ...state, request };
+}
+
+/** The studio's own recap, with club names swapped for Home/Away so the landing page stays team-agnostic. */
+export function neutralRecap(match: SyntheticMatch, seconds: number) {
+  return buildMatchRecap(match, seconds)
+    .replaceAll(match.metadata.homeTeam.name, "the home side")
+    .replaceAll(match.metadata.awayTeam.name, "the away side");
+}
+
+export type MinuteBin = { home: number; away: number };
+
+/** Events per match minute for each side: the data behind the activity strip. */
+export function useMinuteBins(match: SyntheticMatch) {
+  return useMemo(() => {
+    const minutes = Math.ceil(match.metadata.durationSeconds / 60);
+    const bins: MinuteBin[] = Array.from({ length: minutes }, () => ({ home: 0, away: 0 }));
+    for (const event of match.events) {
+      const bin = bins[Math.min(minutes - 1, Math.floor(event.elapsedSeconds / 60))];
+      if (event.teamId === match.metadata.homeTeam.id) bin.home += 1; else bin.away += 1;
+    }
+    const max = Math.max(1, ...bins.map((b) => Math.max(b.home, b.away)));
+    const goals = match.events.filter((e) => e.type === "shot" && e.outcome === "goal");
+    return { bins, max, goals };
+  }, [match]);
+}
+
+const side = (match: SyntheticMatch, teamId: string) => (teamId === match.metadata.homeTeam.id ? "Home" : "Away");
+
+/** Plain-language, team-agnostic label for a notable event. */
+export function readEvent(match: SyntheticMatch, event: MatchEvent): string {
+  const s = side(match, event.teamId);
+  switch (event.type) {
+    case "shot":
+      return event.outcome === "goal" ? `Goal for ${s.toLowerCase()}` : `${s} shot ${event.outcome === "off_target" ? "off target" : event.outcome}`;
+    case "possession_change":
+      return `${s} win it back by ${event.reason === "loose_ball" ? "a loose ball" : event.reason === "restart" ? "a restart" : `${event.reason === "interception" ? "an" : "a"} ${event.reason}`}`;
+    case "tackle":
+      return event.wonBall ? `${s} win a tackle` : `${s} tackle beaten`;
+    case "pressure":
+      return `${s} press at level ${event.intensity}`;
+    case "pass":
+      return event.completed ? `${s} keep the ball moving` : `${s} pass goes astray`;
+  }
+}
+
+/** Rules-based read of the latest three minutes, from the same window features the studio uses. */
+export function readWindow(match: SyntheticMatch, seconds: number) {
+  const features = extractWindowFeatures(match, seconds);
+  const ids = new Set(features.eventIds);
+  const windowEvents = match.events.filter((e) => ids.has(e.id));
+  const homeId = match.metadata.homeTeam.id;
+  let homeThird = 0, awayThird = 0;
+  for (const e of windowEvents) {
+    if (e.type === "pressure" || e.type === "tackle") continue;
+    if (e.teamId === homeId && e.x >= 66) homeThird += 1;
+    if (e.teamId !== homeId && e.x <= 34) awayThird += 1;
+  }
+  const notable = match.events.filter((e) => e.elapsedSeconds <= seconds && (e.type === "shot" || e.type === "possession_change" || (e.type === "tackle" && e.wonBall))).at(-1) ?? null;
+  return { features, homeThird, awayThird, notable, cites: features.eventIds.slice(-4) };
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView } from "motion/react";
 import { ChartColumn, Users } from "lucide-react";
-import type { SyntheticMatch, TeamId } from "../types/match";
+import type { SyntheticMatch } from "../types/match";
 import { explainMatchState, type AudienceMode } from "../ai/explanations";
 import { Segmented } from "../components/Segmented";
 import { EASE_OUT, SPRING_BAR, STAGGER, reveal, swap } from "../motion";
@@ -14,34 +14,26 @@ export function Views({ match, sample, model }: { match: SyntheticMatch; sample:
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.2 });
   const [mode, setMode] = useState<AudienceMode>("fan");
-  const [focus, setFocus] = useState<TeamId | "all">("all");
   const { request } = model;
   useEffect(() => { if (inView) request(); }, [inView, request]);
 
   const ready = model.status === "ready";
-  const explained = explainMatchState(sample.features, model.prediction, mode, focus, match);
+  const explained = explainMatchState(sample.features, model.prediction, mode, "all", match);
   // Without a model result, Fan view falls back to the observed-event recap, as the studio does.
   const insight = !ready && mode === "fan"
     ? { ...explained, headline: "The story so far", narrative: sample.recap, whyItMatters: "Every update comes from events already shown in the replay." }
     : explained;
-  const homeTeam = match.metadata.homeTeam;
-  const awayTeam = match.metadata.awayTeam;
 
   return (
     <section className="lp-section lp-views" id="views" ref={ref} aria-labelledby="views-title">
       <div className="lp-views-grid">
         <motion.div className="lp-views-copy" {...reveal()}>
-          <h2 id="views-title">One moment, two ways in.</h2>
-          <p>Fan view keeps the game human. Analyst view opens up the scores, features and event IDs behind the same explanation. Switch at any time without losing your place.</p>
+          <h2 id="views-title">Detailed insight for every team, at the depth you need.</h2>
+          <p>Follow both sides or pick the team you care about, and the explanation re-targets to them. Fan view keeps the game human; Analyst view opens up the scores, features and event IDs behind the same explanation.</p>
           <div className="lp-views-controls">
             <Segmented id="lp-mode" label="Choose a view" value={mode} onChange={setMode} options={[
               { value: "fan", label: "Fan view", icon: <Users aria-hidden="true" /> },
               { value: "analyst", label: "Analyst view", icon: <ChartColumn aria-hidden="true" /> },
-            ]} />
-            <Segmented id="lp-focus" label="Follow a team" size="sm" value={focus} onChange={setFocus} options={[
-              { value: "all", label: "Both teams" },
-              { value: homeTeam.id, label: homeTeam.abbreviation },
-              { value: awayTeam.id, label: awayTeam.abbreviation },
             ]} />
           </div>
           <p className="lp-views-note">Generated live in your browser by the studio's own explanation code for {clock(sample.time)}.{ready ? "" : model.status === "unavailable" ? " The ONNX model could not load here, so you see the honest unavailable state." : " Loading the ONNX model…"}</p>
@@ -53,7 +45,7 @@ export function Views({ match, sample, model }: { match: SyntheticMatch; sample:
             <span className="tabular">{clock(sample.time)}</span>
           </header>
           <AnimatePresence mode="wait" initial={false}>
-            <motion.div key={`${mode}-${focus}-${insight.headline}`} {...swap} className="lp-view-card-body">
+            <motion.div key={`${mode}-${insight.headline}`} {...swap} className="lp-view-card-body">
               <h3>{insight.headline}</h3>
               <p>{insight.narrative}</p>
               <div className="lp-view-why"><span>{mode === "fan" ? "Why it matters" : "Interpretation"}</span><p>{insight.whyItMatters}</p></div>

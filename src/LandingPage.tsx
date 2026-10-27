@@ -7,7 +7,8 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { Hero } from "./landing/Hero";
 import { Story } from "./landing/Story";
 import { Views } from "./landing/Views";
-import { Architecture } from "./landing/Architecture";
+import { Stack } from "./landing/Stack";
+import { Repository } from "./landing/Repository";
 import { useSampleModel, useSampleMoment } from "./landing/sample";
 import { EASE_OUT, STAGGER, reveal } from "./motion";
 import "./LandingPage.css";
@@ -19,7 +20,8 @@ interface LandingPageProps {
 const NAV = [
   { id: "story", label: "The story" },
   { id: "views", label: "Two views" },
-  { id: "architecture", label: "Under the hood" },
+  { id: "stack", label: "Microsoft stack" },
+  { id: "repository", label: "Repository" },
   { id: "transparency", label: "Transparency" },
 ];
 
@@ -80,7 +82,8 @@ function LandingPage({ match }: LandingPageProps) {
         <Hero match={match} introTo={sample.time} />
         <Story match={match} sample={sample} model={model} />
         <Views match={match} sample={sample} model={model} />
-        <Architecture />
+        <Stack />
+        <Repository />
 
         <section className="lp-section lp-transparency" id="transparency" aria-labelledby="transparency-title">
           <motion.div className="lp-section-head" {...reveal()}>
@@ -99,7 +102,7 @@ function LandingPage({ match }: LandingPageProps) {
         <motion.section className="lp-close" aria-labelledby="close-title" {...reveal(0, 32)}>
           <div>
             <h2 id="close-title">Don't just watch the game. Read it.</h2>
-            <p>One fictional match, fully replayable, in two views. No account needed.</p>
+            <p>Pick any moment of the demo fixture and read it in Fan or Analyst view. No account needed.</p>
           </div>
           <a href="#/studio" className="btn btn-primary btn-lg">Open the match studio <ArrowRight aria-hidden="true" /></a>
         </motion.section>
