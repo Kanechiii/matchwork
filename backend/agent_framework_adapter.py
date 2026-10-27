@@ -10,11 +10,6 @@ import os
 from urllib.parse import urlparse
 from typing import Any
 
-from dotenv import load_dotenv
-from pathlib import Path
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-
 
 def configured_endpoint() -> tuple[str, str, str]:
     base_url = os.getenv("AZURE_OPENAI_BASE_URL", "").strip().rstrip("/")
