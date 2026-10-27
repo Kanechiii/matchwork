@@ -50,6 +50,23 @@ assert.equal(gate.isCurrent(second), false);
 const stalePrediction = { label: "CONTROL", probabilities: [1, 0, 0], confidence: 1, backend: "onnxruntime-web", asOfSeconds: 15 };
 assert.equal(explainMatchState(extractWindowFeatures(match, 16), stalePrediction, "analyst", "all", match).modelBacked, false);
 assert.equal(explainMatchState(at15, stalePrediction, "analyst", "all", match).modelBacked, true);
+// UI contract: the studio must use sampled features for classifier narrative,
+ // while keeping the real-time event ledger/recap on the independently moving clock.
+for (const replayTime of [14, 15, 16, 29, 30, 15, 16, 0, 5400]) {
+  const sampleTime = Math.floor(replayTime / 15) * 15;
+  const sampledFeatures = extractWindowFeatures(match, sampleTime);
+  const samplePrediction = { ...stalePrediction, asOfSeconds: sampleTime };
+  const analysis = explainMatchState(sampledFeatures, samplePrediction, "analyst", "all", match);
+  assert.equal(analysis.modelBacked, true, `Sampled analysis must be valid at replay ${replayTime}`);
+  assert.ok(analysis.evidenceEventIds.every(id =>
+    match.events.some(event => event.id === id && event.elapsedSeconds <= sampleTime)),
+    "Model citations must be limited to the sampled observation window");
+  const replayRecap = buildMatchRecap(match, replayTime);
+  assert.ok(replayRecap.includes(`Through ${String(Math.floor(replayTime / 60)).padStart(2,"0")}:${String(replayTime % 60).padStart(2,"0")}`));
+  const stale = { ...samplePrediction, asOfSeconds: sampleTime + 15 };
+  assert.equal(explainMatchState(sampledFeatures, stale, "analyst", "all", match).modelBacked, false);
+}
+
 assert.throws(() => buildMatchRecap(match, 5401));
 
 // Simulated CDN outage: callers share one failed attempt, then a new one succeeds.
