@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import json
 import os
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 from .ai_budget import FoundryBudget, foundry_budget
 
 ModelCall = Callable[[str, str, dict[str, Any]], Awaitable[str]]
+logger = logging.getLogger("matchwork.agents")
 
 ANALYST_PROMPT = (
     "Role: tactical_analyst. You analyze synthetic football event evidence only. "
@@ -192,7 +194,9 @@ async def orchestrate_foundry_insight(
     except AgentAuditRejected:
         record("orchestrator", "rejected", "Untrusted agent output failed citation audit")
         return fallback("audit_rejected")
-    except Exception:
+    except Exception as exc:
+        # Only log exception category, never API credentials or prompt contents.
+        logger.warning("Multi-agent specialist failure type=%s", type(exc).__name__)
         # Provider errors, timeouts and malformed SDK responses are recoverable.
         # Do not return exception text or secrets to public callers.
         record("orchestrator", "failed", "A specialist failed; original fallback preserved")
