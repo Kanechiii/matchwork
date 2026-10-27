@@ -39,7 +39,8 @@ class AuthEvidenceTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(self.request(path).status_code, 401)
                 self.assertEqual(self.request(path, token="invalid").status_code, 401)
-                self.assertEqual(self.request(path, token=TOKEN).status_code, 200)
+                with patch("backend.main.foundry_budget.acquire", return_value="ai_disabled"):
+                    self.assertEqual(self.request(path, token=TOKEN).status_code, 200)
 
     def test_missing_config_fails_closed(self):
         with patch.dict(os.environ, {"MATCHWORK_API_ACCESS_TOKEN": ""}):
