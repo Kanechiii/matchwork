@@ -26,21 +26,21 @@ def configure_tracing() -> bool:
     if not connection:
         raise RuntimeError("Application Insights connection string required for tracing")
 
-    from microsoft.opentelemetry import use_microsoft_opentelemetry
+    from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
+    from opentelemetry import trace
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 
-    use_microsoft_opentelemetry(
-        enable_azure_monitor=True,
-        azure_monitor_connection_string=connection,
-        sampling_ratio=0.1,
-        enable_sensitive_data=False,
-        instrumentation_options={
-            "agent-framework": {
-                "enabled": True,
-                "agent_name": "Matchwork Multi-Agent",
-                "agent_id": "matchwork-multi-agent",
-            }
-        },
+    provider = TracerProvider(
+        resource=Resource.create({"service.name": "matchwork-api"}),
+        sampler=ParentBased(TraceIdRatioBased(0.1)),
     )
+    provider.add_span_processor(BatchSpanProcessor(
+        AzureMonitorTraceExporter(connection_string=connection)
+    ))
+    trace.set_tracer_provider(provider)
     return True
 
 
