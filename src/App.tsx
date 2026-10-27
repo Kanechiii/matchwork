@@ -62,22 +62,6 @@ function describeEvent(event: MatchEvent): string {
   }
 }
 
-interface StatRowProps {
-  label: string;
-  home: string | number;
-  away: string | number;
-}
-
-function StatRow({ label, home, away }: StatRowProps) {
-  return (
-    <div className="mw-stat-row">
-      <strong>{home}</strong>
-      <span>{label}</span>
-      <strong>{away}</strong>
-    </div>
-  );
-}
-
 function App() {
   const [replay, setReplay] = useState(() =>
     createReplayState(match),
