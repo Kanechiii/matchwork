@@ -86,3 +86,28 @@
 @media(max-width:760px){.mw-topbar{padding:0 18px;height:64px}.mw-topnav{display:none}.mw-nav-end{font-size:9px}.mw-top-divider,.mw-nav-end>.mw-live-dot,.mw-nav-end>span:nth-child(2){display:none}.mw-content{padding:26px 15px 0}.mw-pagehead{align-items:flex-start;flex-direction:column;gap:20px}.mw-pagehead h1{letter-spacing:-1.2px}.mw-mode-switch{width:100%}.mw-mode-switch button{flex:1}.mw-main-grid{grid-template-columns:1fr}.mw-match-panel{padding:17px 14px}.mw-scoreboard{grid-template-columns:minmax(0,1fr) minmax(130px,1.4fr) minmax(0,1fr);gap:3px;margin:25px 0}.mw-crest{width:50px;height:50px}.mw-crest span{font-size:22px}.mw-score{font-size:51px;gap:7px}.mw-team h2{font-size:12px}.mw-match-round{font-size:8px}.mw-replay-console{padding:16px 14px}.mw-console-note{display:none}.mw-stats-panel{margin-top:18px}.mw-stat-grid{grid-template-columns:1fr}.mw-pagehead p{max-width:480px}}
 @media(max-width:410px){.mw-content{padding-left:10px;padding-right:10px}.mw-topbar{padding:0 12px}.mw-brand{font-size:17px}.mw-brand-icon{width:27px;height:27px}.mw-demo-tag{font-size:8px}.mw-match-panel{padding:14px 10px}.mw-match-top{font-size:8px}.mw-score{font-size:42px}.mw-scoreboard{grid-template-columns:1fr 1.3fr 1fr}.mw-team h2{font-size:11px}.mw-replay-console{padding:14px 10px}.mw-control-row{align-items:start}.mw-play{padding:10px}.mw-technical-times{gap:4px}.mw-technical-times small{font-size:7px}.mw-technical-times strong{font-size:12px}.mw-panel{padding:17px 14px}.mw-time-marks{font-size:7px}.mw-possession-heading{font-size:9px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+
+/* Match center refinements: keep the score contained and readable at every viewport. */
+.mw-scoreboard{width:100%;max-width:830px;grid-template-columns:minmax(0,1fr) minmax(140px,190px) minmax(0,1fr);gap:clamp(12px,3vw,35px);margin:27px auto 30px;}
+.mw-score-center{position:relative;z-index:2;min-width:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.mw-score{width:100%;display:flex;justify-content:center;align-items:center;gap:clamp(8px,1vw,15px);font-size:clamp(50px,5.3vw,76px);line-height:1;letter-spacing:-2px;font-variant-numeric:tabular-nums;}
+.mw-score>span{display:block;flex:0 0 auto;min-width:1ch;white-space:nowrap;line-height:1;}
+.mw-score>b{flex:0 0 auto;font-size:.5em;line-height:1;}
+.mw-team{position:relative;z-index:2;min-width:0;max-width:100%;overflow-wrap:anywhere;}
+.mw-team h2{max-width:100%;margin:8px 0 2px;line-height:1.3;font-size:clamp(13px,1.4vw,18px);}
+.mw-crest{flex-shrink:0;}
+.mw-pagehead{margin-bottom:21px;}
+.mw-pagehead h1{font-size:clamp(24px,2.2vw,33px);letter-spacing:-.7px;margin:0 0 5px;}
+.mw-pagehead p{font-size:12px;}
+.mw-topnav button{border:0;background:transparent;font-size:12px;color:#92a9a8;padding:8px 0;transition:color .2s;}
+.mw-topnav button:hover{color:var(--lime);}
+.mw-topnav button:focus-visible{outline:2px solid var(--lime);outline-offset:3px;}
+.mw-match-panel::after{z-index:0;opacity:.45;}
+.mw-stat-grid{gap:10px 25px;}
+.mw-stat{min-width:0;grid-template-columns:minmax(70px,1fr) minmax(0,1.4fr) minmax(70px,1fr);}
+.mw-stat strong{min-width:0;overflow-wrap:anywhere;}
+.mw-possession-heading{flex-wrap:wrap;}
+.mw-analyst .mw-pagehead h1{font-size:clamp(25px,2.6vw,36px);}
+@media(max-width:760px){.mw-scoreboard{grid-template-columns:minmax(0,1fr) minmax(100px,140px) minmax(0,1fr);gap:8px;margin:22px auto}.mw-score{font-size:clamp(36px,8.2vw,54px);gap:6px}.mw-team h2{font-size:12px}.mw-score-time{font-size:14px}.mw-match-round{font-size:8px;letter-spacing:.5px;}}
+@media(max-width:410px){.mw-scoreboard{grid-template-columns:minmax(0,1fr) minmax(88px,120px) minmax(0,1fr);gap:4px}.mw-score{font-size:clamp(31px,9vw,42px);letter-spacing:-1px;gap:4px}.mw-team h2{font-size:10px}.mw-team small{font-size:8px}.mw-crest{width:42px;height:42px}.mw-score-time{font-size:12px;gap:5px}.mw-score-time span:last-child{font-size:10px}.mw-stat{grid-template-columns:minmax(55px,1fr) minmax(0,1.2fr) minmax(55px,1fr)}}
