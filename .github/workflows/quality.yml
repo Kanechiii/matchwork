@@ -67,6 +67,9 @@ jobs:
       - name: Verify statistics engine
         run: node scripts/verifyStats.mjs
 
+      - name: Verify Phase 8 synthetic fixtures and player statistics
+        run: node scripts/verifyLeague.mjs
+
       - name: Verify match replay
         run: node scripts/verifyReplay.mjs
 

@@ -1,5 +1,5 @@
 
-export type TeamId = "northbridge" | "harborpoint";
+export type TeamId = string;
 
 export type Position = "GK" | "DEF" | "MID" | "FWD";
 

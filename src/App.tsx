@@ -22,6 +22,8 @@ import { explainMatchState, buildMatchRecap, type AudienceMode } from "./ai/expl
 import type { TeamId } from "./types/match";
 import "./App.css";
 import LandingPage from "./LandingPage";
+import { leagueFixtures, leagueTeams } from "./data/league";
+import { calculatePlayerStats, aggregatePlayerStats } from "./engine/calculatePlayerStats";
 import { Brand } from "./components/Brand";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { Pitch } from "./components/Pitch";
@@ -72,7 +74,7 @@ function describeEvent(event: MatchEvent): string {
   }
 }
 
-function MatchStudio() {
+function MatchStudio({ match, selectedFixture, onSelectFixture }: { match: typeof leagueFixtures[number]["match"]; selectedFixture: string; onSelectFixture: (id: string) => void }) {
   const [replay, setReplay] = useState(() =>
     createReplayState(match),
   );
@@ -83,6 +85,8 @@ function MatchStudio() {
   const [dismissedEventId, setDismissedEventId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [insightTab, setInsightTab] = useState<"story" | "recap">("story");
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+  const [playerView, setPlayerView] = useState<"replay" | "season">("replay");
   
 const [aiResponse, setAiResponse] = useState<{
   key: string;
@@ -168,7 +172,7 @@ useEffect(() => {
   const currentFrame = getReplayFrame(match, replay);
   const event = currentFrame.latestEvent;
 
-  if (!event) return;
+  if (!event || match.metadata.id !== demoMatch.id) return;
 
   const features = extractWindowFeatures(
     match,
@@ -266,6 +270,13 @@ useEffect(() => {
   const homeShare = Math.round((home.possessionPct / possessionTotal) * 100);
   const visibleEvents = frame.recentEvents.slice().reverse();
   const onSeek = (time: number) => setReplay((current) => seekReplay(current, match, time));
+
+  const playerStats = calculatePlayerStats(match, replay.elapsedSeconds);
+  const leagueStats = aggregatePlayerStats(leagueFixtures.map(f => f.match));
+  const displayedPlayers = (playerView === "replay" ? playerStats : leagueStats)
+    .filter(p => favoriteTeam === "all" || p.teamId === favoriteTeam)
+    .sort((a, b) => b.goals - a.goals || b.shots - a.shots || a.name.localeCompare(b.name));
+  const focusedPlayer = selectedPlayer ? displayedPlayers.find(p => p.playerId === selectedPlayer) : null;
 
   // ---- Presentation layer. Everything above this line is the unchanged replay and insight logic. ----
   const durationSeconds = match.metadata.durationSeconds;
@@ -381,6 +392,20 @@ useEffect(() => {
             { value: "analyst", label: "Analyst view", icon: <ChartColumn aria-hidden="true" /> },
           ]} />
         </motion.div>
+
+        <motion.section className="card phase8-fixtures" variants={enter} aria-label="Choose a fictional match">
+          <div className="card-head"><div><span className="eyebrow">Explore the league</span><h2>Choose your match</h2></div><span className="count">{leagueTeams.length} clubs · {leagueFixtures.length} fixtures</span></div>
+          <div className="phase8-match-select">
+            <label htmlFor="phase8-fixture">Selected fixture</label>
+            <select id="phase8-fixture" value={selectedFixture} onChange={event => onSelectFixture(event.target.value)}>
+              {leagueFixtures.map(f => <option key={f.id} value={f.id}>{f.round} · {f.match.metadata.title}</option>)}
+            </select>
+          </div>
+          <div className="phase8-fixture-strip" aria-label="Match fixtures">
+            {leagueFixtures.map(f => <button type="button" key={f.id} className={selectedFixture === f.id ? "is-selected" : ""} aria-pressed={selectedFixture === f.id} onClick={() => onSelectFixture(f.id)}><small>{f.round}</small><strong>{f.match.metadata.homeTeam.abbreviation} – {f.match.metadata.awayTeam.abbreviation}</strong></button>)}
+          </div>
+          {match.metadata.id !== demoMatch.id && <p className="phase8-notice">This synthetic fixture supports replay, in-browser model insights and player stats. Secure Foundry narration is limited to the canonical original match until the server ledger is expanded.</p>}
+        </motion.section>
 
         <motion.section className="card scoreboard" aria-label="Match scoreboard and replay" variants={enter}>
           <div className="scoreboard-top">
@@ -682,6 +707,18 @@ useEffect(() => {
           </div>
         </motion.section>
 
+        <motion.section className="card phase8-players" id="players" variants={enter} aria-label="Synthetic player performance">
+          <div className="card-head"><div><span className="eyebrow">Players · Event-derived</span><h2>Player performance</h2></div><div className="phase8-view-switch" role="group" aria-label="Statistics period"><button type="button" aria-pressed={playerView === "replay"} className={playerView === "replay" ? "is-selected" : ""} onClick={() => setPlayerView("replay")}>Replay so far</button><button type="button" aria-pressed={playerView === "season"} className={playerView === "season" ? "is-selected" : ""} onClick={() => setPlayerView("season")}>All fixtures</button></div></div>
+          <p className="phase8-description">Every number below comes from recorded synthetic events. Select a player for their match activity and evidence references.</p>
+          <div className="phase8-player-grid">{displayedPlayers.map(p => <button type="button" key={p.playerId} className={focusedPlayer?.playerId === p.playerId ? "phase8-player is-selected" : "phase8-player"} onClick={() => setSelectedPlayer(current => current === p.playerId ? null : p.playerId)} aria-pressed={focusedPlayer?.playerId === p.playerId}>
+            <span className="phase8-player-initial">{p.name.split(" ").map(w => w[0]).join("").slice(0,2)}</span><span className="phase8-player-name"><strong>{p.name}</strong><small>#{p.number} · {p.position} · {leagueTeams.find(t=>t.id===p.teamId)?.abbreviation}</small></span><span className="phase8-player-goals"><b>{p.goals}</b><small>goals</small></span>
+          </button>)}</div>
+          {focusedPlayer && <div className="phase8-player-detail" aria-live="polite"><h3>{focusedPlayer.name} <small>· #{focusedPlayer.number}</small></h3><div className="phase8-player-numbers">
+            {([{label:"Goals",value:focusedPlayer.goals},{label:"Shots",value:focusedPlayer.shots},{label:"On target",value:focusedPlayer.shotsOnTarget},{label:"Passes",value:focusedPlayer.passesCompleted + "/" + focusedPlayer.passesAttempted},{label:"Pass accuracy",value:focusedPlayer.passCompletionPct + "%"},{label:"Tackles won",value:focusedPlayer.tacklesWon},{label:"Pressures",value:focusedPlayer.pressures},{label:"Passes received",value:focusedPlayer.passesReceived}]).map(v=><div key={v.label}><strong>{v.value}</strong><span>{v.label}</span></div>)}
+          </div>{isAnalyst && <details><summary>Observed event evidence ({focusedPlayer.evidenceIds.length})</summary><p>{focusedPlayer.evidenceIds.slice(-18).join(" · ") || "No observed actions yet"}</p></details>}</div>}
+          <p className="phase8-notice">All players, fixtures and statistics are fictional. These figures are not real-world performance measurements.</p>
+        </motion.section>
+
         <footer className="studio-footer">
           <span>Matchwork. The game, understood.</span>
           <span>Synthetic data use only. Fictional teams, players and events; no real match data or personal information. Model scores are illustrative.</span>
@@ -717,6 +754,8 @@ const digit = {
 } as const;
 
 function App() {
+  const [selectedFixture, setSelectedFixture] = useState(leagueFixtures[0].id);
+  const activeFixture = leagueFixtures.find(f => f.id === selectedFixture) ?? leagueFixtures[0];
   const [page, setPage] = useState<"landing" | "studio">(
     () => window.location.hash.startsWith("#/studio") ? "studio" : "landing",
   );
@@ -740,7 +779,7 @@ function App() {
     <MotionConfig reducedMotion="user">
       <AnimatePresence mode="wait">
         <motion.div key={page} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.35 } }} exit={{ opacity: 0, transition: { duration: 0.2 } }}>
-          {page === "landing" ? <LandingPage match={match} /> : <MatchStudio />}
+          {page === "landing" ? <LandingPage match={match} /> : <MatchStudio key={activeFixture.id} match={activeFixture.match} selectedFixture={activeFixture.id} onSelectFixture={setSelectedFixture} />}
         </motion.div>
       </AnimatePresence>
     </MotionConfig>
