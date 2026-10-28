@@ -292,7 +292,7 @@ async def public_agent_preview(payload: PublicPreviewRequest, request: Request, 
     result = await orchestrate_foundry_insight(evidence, payload.audience, fallback)
     if result["source"] == "foundry":
         try:
-            client.set(cache_key, json.dumps(result, ensure_ascii=False), ex=86400 * 7)
+            client.set(cache_key, json.dumps(result, ensure_ascii=False), ex=86400 * 21)
         except Exception:
             # The response remains valid, but a failed cache must not bypass
             # subsequent shared budget reservations.
