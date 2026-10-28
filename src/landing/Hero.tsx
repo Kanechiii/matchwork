@@ -152,7 +152,7 @@ export function Hero({ match, introTo }: { match: SyntheticMatch; introTo: numbe
             <a href="#/studio" className="btn btn-primary btn-lg">Open the match studio <ArrowRight aria-hidden="true" /></a>
             <a href="#story" className="btn btn-secondary btn-lg">Follow the story</a>
           </div>
-          <p className="lp-note"><Info aria-hidden="true" /> The demo runs on one seeded fictional fixture. More teams are on the way.</p>
+          <p className="lp-note"><Info aria-hidden="true" /> Explore six fictional clubs, nine seeded fixtures, and 66 event-linked player profiles in the studio.</p>
         </motion.div>
       </div>
       <LiveInsightCard match={match} introTo={introTo} />
