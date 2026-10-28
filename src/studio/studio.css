@@ -45,12 +45,14 @@
 .club-chip:hover { border-color: var(--border-strong); background: var(--surface-2); color: var(--text); }
 .club-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
 .club-chip .team-crest { margin-left: -5px; }
-.fixture-rail { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.fixture-scroller { position: relative; flex: 1; min-width: 0; display: flex; gap: 8px; padding: 4px 3px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: 4px; overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none; }
+/* Bound the fixture rail to its card: edge fades previously obscured team crests
+   and made partially visible match cards appear to overlap the container. */
+.phase8-fixtures { min-width: 0; }
+.fixture-browser { width: 100%; max-width: 100%; }
+.fixture-rail { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+.fixture-scroller { position: relative; width: 100%; min-width: 0; display: flex; gap: 8px; padding: 6px 10px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; scroll-padding-inline: 10px; overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none; }
 .fixture-scroller::-webkit-scrollbar { display: none; }
-.fixture-rail.has-start .fixture-scroller { -webkit-mask-image: linear-gradient(to right, transparent, black 36px); mask-image: linear-gradient(to right, transparent, black 36px); }
-.fixture-rail.has-end .fixture-scroller { -webkit-mask-image: linear-gradient(to left, transparent, black 36px); mask-image: linear-gradient(to left, transparent, black 36px); }
-.fixture-rail.has-start.has-end .fixture-scroller { -webkit-mask-image: linear-gradient(to right, transparent, black 36px, black calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, black 36px, black calc(100% - 36px), transparent); }
+/* Arrows remain outside the clipping region; no opacity mask overlays team tiles. */
 .rail-btn { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-1); transition: opacity .15s, background-color .15s, color .15s; }
 .rail-btn:hover:not(:disabled) { background: var(--sunken); color: var(--text); }
 .rail-btn:disabled { opacity: .35; cursor: default; }
