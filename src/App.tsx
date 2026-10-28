@@ -33,7 +33,8 @@ import { TeamCrest } from "./components/TeamCrest";
 import { EASE_IN, EASE_OUT, SPRING_BAR, SPRING_UI, swap } from "./motion";
 import {
   requestMatchInsight,
-  type MatchEvidence,
+  startOperatorSession,
+  hasOperatorSession,
   type MatchInsight,
 } from "./services/matchworkAI";
 import { buildRoster, describeEvent, formatClock } from "./studio/format";
@@ -82,6 +83,24 @@ const visibleAiInsight =
     : null;
   const [modelStatus, setModelStatus] = useState<"loading" | "ready" | "unavailable">("loading");
   const [modelError, setModelError] = useState("");
+  const [operatorCode, setOperatorCode] = useState("");
+  const [operatorReady, setOperatorReady] = useState(hasOperatorSession);
+  const [operatorError, setOperatorError] = useState("");
+  const [operatorBusy, setOperatorBusy] = useState(false);
+  const enableOperatorAI = async () => {
+    if (operatorBusy || !operatorCode) return;
+    setOperatorBusy(true);
+    setOperatorError("");
+    try {
+      await startOperatorSession(operatorCode);
+      setOperatorReady(true);
+      setOperatorCode("");
+    } catch (error) {
+      setOperatorError(error instanceof Error ? error.message : "Operator access unavailable");
+    } finally {
+      setOperatorBusy(false);
+    }
+  };
   const insightWindow = Math.floor(replay.elapsedSeconds / 15);
   const modelSampleTime = insightWindow * 15;
   const [retryCount, setRetryCount] = useState(0);
@@ -152,7 +171,7 @@ useEffect(() => {
   const currentFrame = getReplayFrame(match, replay);
   const event = currentFrame.latestEvent;
 
-  if (!event || match.metadata.id !== demoMatch.id) return;
+  if (!event || match.metadata.id !== demoMatch.id || !operatorReady) return;
 
   const features = extractWindowFeatures(
     match,
@@ -163,32 +182,11 @@ useEffect(() => {
   const requestKey =
     `${replay.elapsedSeconds}:${replay.status}:${audience}`;
 
-  const eventEvidence: MatchEvidence = {
-    minute: replay.elapsedSeconds / 60,
-    event_type: event.type,
-    team:
-      event.teamId === match.metadata.homeTeam.id
-        ? match.metadata.homeTeam.name
-        : match.metadata.awayTeam.name,
-    description:
-      `Latest event: ${describeEvent(event)}. ` +
-      `Rolling three-minute window: ` +
-      `${features.passesCompleted} of ` +
-      `${features.passesAttempted} passes completed, ` +
-      `${features.shots} shots, ` +
-      `${features.pressures} pressures, ` +
-      `${features.turnovers} possession changes.`,
-    score:
-      `${currentFrame.stats.home.goals}-` +
-      `${currentFrame.stats.away.goals}`,
+  const eventEvidence = {
+    match_id: demoMatch.id as "matchwork-demo-001",
+    as_of_seconds: replay.elapsedSeconds,
     evidence_ids: features.eventIds.slice(-5),
-    statistics: {
-      passes_attempted: features.passesAttempted,
-      passes_completed: features.passesCompleted,
-      shots: features.shots,
-      pressures: features.pressures,
-      turnovers: features.turnovers
-    }
+    audience,
   };
 
   const fallbackText = buildMatchRecap(
@@ -199,8 +197,6 @@ useEffect(() => {
   const timer = window.setTimeout(() => {
     requestMatchInsight(
       eventEvidence,
-      fallbackText,
-      audience,
       controller.signal
     )
       .then((result) => {
@@ -235,7 +231,7 @@ useEffect(() => {
     window.clearTimeout(timer);
     controller.abort();
   };
-}, [replay, audience]);
+}, [replay, audience, match, operatorReady]);
 
   const isAnalyst = audience === "analyst";
   const homeTeam = match.metadata.homeTeam;
@@ -423,6 +419,25 @@ useEffect(() => {
           ]} />
         </motion.div>
 
+        {match.metadata.id === demoMatch.id && (
+          <section className="card" aria-label="Optional Foundry demonstration access">
+            <div className="card-head">
+              <div><span className="eyebrow">Optional AI demonstration</span><h2>Microsoft Foundry narration</h2></div>
+              <span className="count">{operatorReady ? "Operator session active" : "Rules-based mode"}</span>
+            </div>
+            {operatorReady ? (
+              <p>Operator session enabled. Pause the original fixture to request a budgeted, evidence-verified Foundry explanation. A labelled fallback remains available.</p>
+            ) : (
+              <form onSubmit={(event) => { event.preventDefault(); void enableOperatorAI(); }}>
+                <p>Replay and ONNX work without access. Enter the project operator code to enable protected Foundry narration.</p>
+                <label htmlFor="operator-demo-code">Operator access code</label>
+                <input id="operator-demo-code" type="password" autoComplete="off" value={operatorCode} onChange={(e) => setOperatorCode(e.target.value)} required minLength={32} maxLength={256} />
+                <button className="btn btn-secondary btn-sm" type="submit" disabled={operatorBusy || operatorCode.length < 32}>{operatorBusy ? "Connecting…" : "Enable Foundry demo"}</button>
+                {operatorError && <p role="alert">{operatorError}</p>}
+              </form>
+            )}
+          </section>
+        )}
         <motion.section className="card phase8-fixtures" variants={enter} aria-label="Choose a fictional match">
           <div className="card-head">
             <div><span className="eyebrow">Explore the league</span><h2>Choose your match</h2></div>
