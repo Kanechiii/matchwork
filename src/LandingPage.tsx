@@ -9,6 +9,7 @@ import { Story } from "./landing/Story";
 import { Views } from "./landing/Views";
 import { Stack } from "./landing/Stack";
 import { Repository } from "./landing/Repository";
+import { Team } from "./landing/Team";
 import { useSampleModel, useSampleMoment } from "./landing/sample";
 import { EASE_OUT, STAGGER, reveal } from "./motion";
 import "./LandingPage.css";
@@ -23,6 +24,7 @@ const NAV = [
   { id: "stack", label: "Microsoft stack" },
   { id: "repository", label: "Repository" },
   { id: "transparency", label: "Transparency" },
+  { id: "team", label: "Team" },
 ];
 
 // From the README's Security, Cost and Limitations section and docs/.
@@ -98,6 +100,8 @@ function LandingPage({ match }: LandingPageProps) {
             ))}
           </dl>
         </section>
+
+        <Team />
 
         <motion.section className="lp-close" aria-labelledby="close-title" {...reveal(0, 32)}>
           <div>

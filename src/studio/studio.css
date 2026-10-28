@@ -55,15 +55,15 @@
 .rail-btn:hover:not(:disabled) { background: var(--sunken); color: var(--text); }
 .rail-btn:disabled { opacity: .35; cursor: default; }
 .rail-btn svg { width: 16px; height: 16px; }
-.fixture-card { flex: 0 0 188px; scroll-snap-align: start; display: grid; gap: 10px; padding: 12px; text-align: left; border: 1px solid var(--border); border-radius: var(--radius-l); background: var(--surface); transition: transform .18s, border-color .18s, background-color .18s, box-shadow .18s; }
+.fixture-card { flex: 0 0 auto; min-width: 188px; scroll-snap-align: start; display: grid; gap: 10px; padding: 12px; text-align: left; border: 1px solid var(--border); border-radius: var(--radius-l); background: var(--surface); transition: transform .18s, border-color .18s, background-color .18s, box-shadow .18s; }
 .fixture-card:hover { transform: translateY(-2px); border-color: var(--border-strong); box-shadow: var(--shadow-1); }
 .fixture-card.is-selected { border-color: var(--accent); background: var(--accent-soft); }
 .fixture-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px; }
 .fixture-card-top small { font-size: 11px; font-weight: 600; color: var(--text-3); }
 .fixture-viewing { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--accent-text); }
 .fixture-viewing .status-dot { width: 6px; height: 6px; background: var(--accent); }
-.fixture-card-teams { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.fixture-card-team { display: inline-flex; align-items: center; gap: 7px; }
+.fixture-card-teams { display: flex; align-items: center; justify-content: space-between; gap: 10px; white-space: nowrap; }
+.fixture-card-team { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; }
 .fixture-card-team strong { font-size: 14px; font-weight: 700; letter-spacing: .02em; }
 .fixture-card-vs { font-size: 11px; color: var(--text-3); }
 
@@ -320,7 +320,7 @@
 @media (max-width: 560px) {
   /* Icon-only view switcher; labels stay available to assistive tech. */
   .statview .sv-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .fixture-card { flex-basis: 164px; }
+  .fixture-card { min-width: 164px; }
   .rail-btn { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
