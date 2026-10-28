@@ -169,6 +169,8 @@ async def generate_insight(
 class MultiAgentResponse(InsightResponse):
     model_calls: int
     trace: list[dict[str, str]]
+    # Original observed clock for a cached public narrative; no future evidence.
+    as_of_seconds: int | None = None
 
 
 @app.post("/api/agents/insights", response_model=MultiAgentResponse, dependencies=[Depends(require_ai_access)])
@@ -257,21 +259,29 @@ async def public_agent_preview(payload: PublicPreviewRequest, request: Request, 
     if not isinstance(ledger, SharedAttemptLedger):
         return _public_fallback(evidence, fallback, "ai_budget_unavailable")
 
-    # Cache keys contain no user input beyond the constrained clock and audience.
-    # The canonical ledger digest invalidates caches if the event data changes.
+    # Reuse the most recent *earlier* verified model narrative within five
+    # minutes. This also shares results across browser sessions and judges,
+    # without paying again for every replay minute. Never return future events.
     digest = load_replay()["events_sha256"][:16]
-    cache_id = sha256(
-        f"{digest}:{payload.match_id}:{payload.as_of_seconds}:{payload.audience}".encode()
-    ).hexdigest()
-    cache_key = f"matchwork:public-ai:{{foundry}}:cache:{cache_id}"
-    lock_key = f"matchwork:public-ai:{{foundry}}:lock:{cache_id}"
+
+    def cache_key_at(second: int) -> str:
+        cache_id = sha256(
+            f"{digest}:{payload.match_id}:{second}:{payload.audience}".encode()
+        ).hexdigest()
+        return f"matchwork:public-ai:{{foundry}}:cache:{cache_id}"
+
+    cache_key = cache_key_at(payload.as_of_seconds)
+    lock_key = cache_key.replace(":cache:", ":lock:")
     client = ledger.client
     try:
-        cached = client.get(cache_key)
-        if cached:
-            result = json.loads(cached)
-            if result.get("source") == "foundry" and result.get("status") == "success":
-                return MultiAgentResponse(**result)
+        for seconds in range(payload.as_of_seconds, max(-1, payload.as_of_seconds - 301), -60):
+            cached = client.get(cache_key_at(seconds))
+            if cached:
+                result = json.loads(cached)
+                if result.get("source") == "foundry" and result.get("status") == "success":
+                    # Even older cache entries must be explicitly timestamped.
+                    result["as_of_seconds"] = seconds
+                    return MultiAgentResponse(**result)
         # One execution across concurrent replicas. A 45-second TTL prevents
         # a stuck execution from blocking this sample forever.
         if not client.set(lock_key, "1", nx=True, ex=45):
@@ -287,10 +297,17 @@ async def public_agent_preview(payload: PublicPreviewRequest, request: Request, 
         _positive_limit("MATCHWORK_PUBLIC_AI_MAX_CALLS_PER_DAY", 10),
     )
     if refusal:
-        return _public_fallback(evidence, fallback, refusal)
+        # Distinguish the public request quota from the global Foundry call
+        # budget; both used to report ai_hourly_limited.
+        public_status = {
+            "ai_hourly_limited": "public_ai_hourly_limited",
+            "ai_daily_limited": "public_ai_daily_limited",
+        }.get(refusal, refusal)
+        return _public_fallback(evidence, fallback, public_status)
 
     result = await orchestrate_foundry_insight(evidence, payload.audience, fallback)
     if result["source"] == "foundry":
+        result["as_of_seconds"] = payload.as_of_seconds
         try:
             client.set(cache_key, json.dumps(result, ensure_ascii=False), ex=86400 * 21)
         except Exception:
