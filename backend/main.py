@@ -17,7 +17,7 @@ from .multi_agent import orchestrate_foundry_insight
 from .observability import configure_tracing
 from .auth import require_ai_access
 from .operator_session import OperatorLogin, start_operator_session, end_operator_session, require_operator_session
-from .trusted_evidence import resolve_evidence, load_replay, MATCH_ID
+from .trusted_evidence import resolve_evidence, load_replay, MATCH_ID, MATCH_IDS
 from .shared_budget import SharedAttemptLedger
 
 
@@ -68,7 +68,7 @@ class InsightRequest(BaseModel):
 
 
 class TrustedInsightRequest(BaseModel):
-    match_id: Literal["matchwork-demo-001"]
+    match_id: Literal["matchwork-demo-001", "matchwork-demo-002", "matchwork-demo-003", "matchwork-demo-004", "matchwork-demo-005", "matchwork-demo-006", "matchwork-demo-007", "matchwork-demo-008", "matchwork-demo-009"]
     as_of_seconds: int = Field(ge=0, le=5400)
     evidence_ids: list[str] = Field(min_length=1, max_length=10)
     audience: Literal["fan", "analyst"] = "fan"
@@ -209,7 +209,7 @@ async def browser_agent_insight(request: TrustedInsightRequest):
 
 class PublicPreviewRequest(BaseModel):
     """No submitted event descriptions or arbitrary IDs are trusted."""
-    match_id: Literal["matchwork-demo-001"]
+    match_id: Literal["matchwork-demo-001", "matchwork-demo-002", "matchwork-demo-003", "matchwork-demo-004", "matchwork-demo-005", "matchwork-demo-006", "matchwork-demo-007", "matchwork-demo-008", "matchwork-demo-009"]
     as_of_seconds: int = Field(ge=0, le=5400)
     audience: Literal["fan", "analyst"] = "fan"
 
@@ -244,7 +244,7 @@ async def public_agent_preview(payload: PublicPreviewRequest, request: Request, 
         raise HTTPException(status_code=403, detail="Origin rejected")
 
     # Load only the known, checksummed server ledger. Client never selects IDs.
-    entries = load_replay()["events"]
+    entries = load_replay(payload.match_id)["events"]
     ids = [
         event["id"] for event in entries
         if event["elapsedSeconds"] <= payload.as_of_seconds
@@ -262,7 +262,7 @@ async def public_agent_preview(payload: PublicPreviewRequest, request: Request, 
     # Reuse the most recent *earlier* verified model narrative within five
     # minutes. This also shares results across browser sessions and judges,
     # without paying again for every replay minute. Never return future events.
-    digest = load_replay()["events_sha256"][:16]
+    digest = load_replay(payload.match_id)["events_sha256"][:16]
 
     def cache_key_at(second: int) -> str:
         cache_id = sha256(

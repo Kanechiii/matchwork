@@ -119,6 +119,36 @@ class PublicPreviewTests(unittest.TestCase):
         self.assertEqual(invoke.await_count, 2)
 
 
+    def test_each_fixture_has_its_own_audited_events(self):
+        from backend.trusted_evidence import load_replay, resolve_evidence, MATCH_IDS
+        for match_id in MATCH_IDS:
+            with self.subTest(match_id=match_id):
+                payload = load_replay(match_id)
+                self.assertEqual(payload["match_id"], match_id)
+                self.assertEqual(len(payload["events"]), 1200)
+                first_id = payload["events"][0]["id"]
+                selected = resolve_evidence(match_id, 60, [first_id])
+                self.assertEqual(selected["evidence_ids"], [first_id])
+                self.assertIn(next(team["name"] for team in (payload["home_team"], payload["away_team"]) if team["id"] == payload["events"][0]["teamId"]), selected["description"])
+
+    def test_fixture_cache_is_isolated(self):
+        async def model(evidence, audience, fallback):
+            return {
+                "source": "foundry",
+                "explanation": evidence["description"],
+                "evidence_ids": evidence["evidence_ids"],
+                "status": "success", "model_calls": 2, "trace": [],
+            }
+        with patch("backend.main.orchestrate_foundry_insight", new=AsyncMock(side_effect=model)) as call:
+            first = self.request()
+            second = self.request(payload={**PAYLOAD, "match_id": "matchwork-demo-002"})
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.json()["source"], "foundry")
+        self.assertEqual(second.json()["source"], "foundry")
+        self.assertEqual(call.await_count, 2, "Cross-fixture cache reuse is forbidden")
+        self.assertNotEqual(first.json()["explanation"], second.json()["explanation"])
+
     def test_origin_and_schema_rejected(self):
         self.assertEqual(self.request(origin="https://external.example").status_code, 403)
         self.assertEqual(self.request(origin="").status_code, 403)

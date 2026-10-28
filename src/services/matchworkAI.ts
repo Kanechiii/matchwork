@@ -9,7 +9,7 @@ export interface MatchInsight {
 }
 
 export interface PublicMatchInsightRequest {
-  match_id: "matchwork-demo-001";
+  match_id: string;
   as_of_seconds: number;
   audience: "fan" | "analyst";
 }
