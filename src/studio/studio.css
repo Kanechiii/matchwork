@@ -39,13 +39,13 @@
 .fixture-check { width: 18px; height: 18px; flex-shrink: 0; color: var(--accent); }
 
 /* ---------- Fixture rail (scrollbar hidden; arrows, swipe and wheel still scroll) ---------- */
-.fixture-browser { display: grid; gap: 10px; }
+.fixture-browser { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
 .club-filter, .metric-picker { display: flex; flex-wrap: wrap; gap: 6px; }
 .club-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-2); font-size: 12px; font-weight: 600; white-space: nowrap; transition: background-color .15s, border-color .15s, color .15s; }
 .club-chip:hover { border-color: var(--border-strong); background: var(--surface-2); color: var(--text); }
 .club-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
 .club-chip .team-crest { margin-left: -5px; }
-.fixture-rail { display: flex; align-items: center; gap: 6px; }
+.fixture-rail { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .fixture-scroller { position: relative; flex: 1; min-width: 0; display: flex; gap: 8px; padding: 4px 3px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: 4px; overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none; }
 .fixture-scroller::-webkit-scrollbar { display: none; }
 .fixture-rail.has-start .fixture-scroller { -webkit-mask-image: linear-gradient(to right, transparent, black 36px); mask-image: linear-gradient(to right, transparent, black 36px); }
