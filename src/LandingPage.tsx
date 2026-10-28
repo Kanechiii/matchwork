@@ -102,7 +102,7 @@ function LandingPage({ match }: LandingPageProps) {
         <motion.section className="lp-close" aria-labelledby="close-title" {...reveal(0, 32)}>
           <div>
             <h2 id="close-title">Don't just watch the game. Read it.</h2>
-            <p>Pick any moment of the demo fixture and read it in Fan or Analyst view. No account needed.</p>
+            <p>Choose from nine fictional fixtures, follow the action, and explore player statistics in Fan or Analyst view. No account needed.</p>
           </div>
           <a href="#/studio" className="btn btn-primary btn-lg">Open the match studio <ArrowRight aria-hidden="true" /></a>
         </motion.section>
