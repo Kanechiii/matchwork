@@ -40,3 +40,19 @@ export async function requestMatchInsight(evidence: MatchEvidenceReference, sign
   if (!response.ok) throw new Error(`Matchwork AI request failed: ${response.status}`);
   return response.json() as Promise<MatchInsight>;
 }
+
+/** Anonymous judging preview. No access codes or model credentials leave Azure. */
+export async function requestPublicMatchInsight(
+  evidence: Pick<MatchEvidenceReference, "match_id" | "as_of_seconds" | "audience">,
+  signal?: AbortSignal,
+): Promise<MatchInsight> {
+  const response = await fetch("/api/public/agents/insights", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(evidence),
+    credentials: "omit",
+    signal,
+  });
+  if (!response.ok) throw new Error(`Public AI preview unavailable: ${response.status}`);
+  return response.json() as Promise<MatchInsight>;
+}
