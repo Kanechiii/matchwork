@@ -1,0 +1,48 @@
+/* Synthetic club crests. --crest is the fictional club colour from the league data. */
+.team-crest { --size: 40px; display: inline-block; width: var(--size); height: var(--size); flex-shrink: 0; overflow: visible; }
+.team-crest.is-xs { --size: 20px; }
+.team-crest.is-sm { --size: 28px; }
+.team-crest.is-md { --size: 40px; }
+.team-crest.is-lg { --size: 52px; }
+.team-crest.is-xl { --size: 72px; }
+.team-crest.is-light { --crest-ink: white; }
+.team-crest.is-dark { --crest-ink: rgb(26 22 18); }
+
+.crest-stop-hi { stop-color: color-mix(in srgb, var(--crest) 80%, white); }
+.crest-stop-lo { stop-color: color-mix(in srgb, var(--crest) 80%, black); }
+.crest-edge { fill: none; stroke: color-mix(in srgb, var(--crest) 55%, black); stroke-width: 1.2; }
+.crest-trim { fill: none; stroke: var(--crest-ink); stroke-opacity: .32; stroke-width: 1.1; }
+.crest-ink { fill: var(--crest-ink); }
+.crest-line { fill: none; stroke: var(--crest-ink); stroke-linecap: round; stroke-linejoin: round; }
+.crest-soft { opacity: .62; }
+.crest-cut { fill: color-mix(in srgb, var(--crest) 78%, black); }
+.crest-ridge { fill: none; stroke: color-mix(in srgb, var(--crest) 85%, black); stroke-width: 1.5; stroke-linecap: round; }
+.crest-shine { fill: white; opacity: 0; animation: crest-shine 7s ease-in-out infinite; animation-delay: var(--crest-delay, 0s); }
+
+/* Gentle, looping emblem motion. Lengths inside SVG transforms are viewBox units. */
+.crest-waves { animation: crest-waves 3.2s linear infinite; }
+.crest-sway { transform-box: view-box; transform-origin: 32px 16px; animation: crest-sway 3.4s ease-in-out infinite alternate; }
+.crest-tree { transform-box: view-box; transform-origin: 32px 53px; animation: crest-tree 4.2s ease-in-out infinite alternate; }
+.crest-twinkle { transform-box: fill-box; transform-origin: center; animation: crest-twinkle 2.6s ease-in-out infinite; animation-delay: var(--crest-delay, 0s); }
+.crest-rays { transform-box: view-box; transform-origin: 32px 37px; animation: crest-rays 2.8s ease-in-out infinite alternate; }
+.crest-shimmer path { animation: crest-shimmer 2.4s ease-in-out infinite alternate; }
+.crest-shimmer path:nth-child(2) { animation-delay: -.8s; }
+.crest-shimmer path:nth-child(3) { animation-delay: -1.6s; }
+.crest-flag { transform-box: view-box; transform-origin: 32px 11.2px; animation: crest-flag 1.4s ease-in-out infinite alternate; }
+
+@keyframes crest-waves { to { transform: translateX(-16px); } }
+@keyframes crest-sway { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+@keyframes crest-tree { from { transform: rotate(-2.5deg); } to { transform: rotate(2.5deg); } }
+@keyframes crest-twinkle { 0%, 100% { transform: scale(.72) rotate(0deg); opacity: .75; } 50% { transform: scale(1.08) rotate(45deg); opacity: 1; } }
+@keyframes crest-rays { from { transform: scale(.9); opacity: .7; } to { transform: scale(1.06); opacity: 1; } }
+@keyframes crest-shimmer { from { transform: translateX(-1.6px); } to { transform: translateX(1.6px); } }
+@keyframes crest-flag { from { transform: scaleX(1) skewY(0deg); } to { transform: scaleX(.84) skewY(-7deg); } }
+@keyframes crest-shine {
+  0%, 70% { transform: translateX(0); opacity: 0; }
+  74% { opacity: .5; }
+  88%, 100% { transform: translateX(110px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-crest * { animation: none !important; }
+}
