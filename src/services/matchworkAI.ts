@@ -4,6 +4,8 @@ export interface MatchInsight {
   explanation: string;
   evidence_ids: string[];
   status: string;
+  /** Source event time; may precede the paused replay within a safe cache window. */
+  as_of_seconds?: number | null;
 }
 
 export interface PublicMatchInsightRequest {
