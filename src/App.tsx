@@ -106,7 +106,7 @@ const [modelError, setModelError] = useState("");
         setModelError(error instanceof Error ? error.message : "Model could not be loaded");
       });
     return () => { current = false; };
-  }, [insightWindow, retryCount]);
+  }, [insightWindow, retryCount, match]);
 
   // The sampled classifier and live replay are separate clocks. Keep event
   // statistics/recaps live, but classify only the sampled feature window.
@@ -137,7 +137,7 @@ const [modelError, setModelError] = useState("");
     }, 100);
 
     return () => window.clearInterval(timer);
-  }, [replay.status]);
+  }, [replay.status, match]);
 
   const frame = getReplayFrame(match, replay);
   const { home, away } = frame.stats;
@@ -345,7 +345,7 @@ const [modelError, setModelError] = useState("");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [match]);
 
   return (
     <div className={`studio ${isAnalyst ? "is-analyst" : "is-fan"}`}>
