@@ -168,7 +168,9 @@ const [modelError, setModelError] = useState("");
       }, controller.signal)
         .then((result) => {
           if (controller.signal.aborted) return;
-          narrativeCache.current.set(key, result);
+          // Only genuine model output is reusable. A quota fallback must not
+          // remain stuck in memory after the UTC budget window resets.
+          if (result.source === "foundry") narrativeCache.current.set(key, result);
           setAiResponse({ sampleTime, audience, result });
         })
         .catch(() => {
@@ -246,11 +248,17 @@ const [modelError, setModelError] = useState("");
     ? visibleAiInsight.explanation
     : isAnalyst ? recap : momentStory;
   const storyNote = visibleAiInsight?.source === "foundry"
-    ? `Microsoft Foundry · synthetic evidence through ${formatClock(sampleTime)} · interpretation, not established intent`
+    ? `Microsoft Foundry · verified events through ${formatClock(visibleAiInsight.as_of_seconds ?? sampleTime)} · interpretation, not established intent`
     : aiLoading ? `Generating evidence-linked narration through ${formatClock(sampleTime)}; showing observed events meanwhile`
     : isPlaying ? "Live event story · pause or seek for automatic Foundry narration"
     : visibleAiInsight?.source === "rule-based"
-      ? `Foundry unavailable (${visibleAiInsight.status}) · event-based fallback`
+      ? visibleAiInsight.status === "public_ai_hourly_limited"
+        ? "Public AI hourly allowance reached · event-based fallback; cached narratives remain available"
+        : visibleAiInsight.status === "ai_hourly_limited"
+          ? "Shared Foundry hourly allowance reached · event-based fallback"
+          : visibleAiInsight.status === "public_ai_daily_limited" || visibleAiInsight.status === "ai_daily_limited"
+            ? "AI daily allowance reached · event-based fallback"
+            : `Foundry unavailable (${visibleAiInsight.status}) · event-based fallback`
     : aiError || (match.metadata.id !== demoMatch.id
       ? "This fixture uses event-based recaps and in-browser ONNX insights"
       : "Event-based story · Foundry narration appears automatically after seeking or pausing");
