@@ -33,6 +33,7 @@ import { TeamCrest } from "./components/TeamCrest";
 import { EASE_IN, EASE_OUT, SPRING_BAR, SPRING_UI, swap } from "./motion";
 import {
   requestMatchInsight,
+  requestPublicMatchInsight,
   startOperatorSession,
   hasOperatorSession,
   type MatchInsight,
@@ -87,6 +88,8 @@ const visibleAiInsight =
   const [operatorReady, setOperatorReady] = useState(hasOperatorSession);
   const [operatorError, setOperatorError] = useState("");
   const [operatorBusy, setOperatorBusy] = useState(false);
+  const [publicAiBusy, setPublicAiBusy] = useState(false);
+  const [publicAiNotice, setPublicAiNotice] = useState("");
   const enableOperatorAI = async () => {
     if (operatorBusy || !operatorCode) return;
     setOperatorBusy(true);
@@ -157,6 +160,28 @@ const visibleAiInsight =
 
   const frame = getReplayFrame(match, replay);
   const { home, away } = frame.stats;
+
+  const generatePublicNarrative = async () => {
+    if (publicAiBusy || match.metadata.id !== demoMatch.id || replay.status === "playing" || !frame.latestEvent) return;
+    setPublicAiBusy(true);
+    setPublicAiNotice("");
+    const key = `${replay.elapsedSeconds}:${replay.status}:${audience}`;
+    try {
+      const result = await requestPublicMatchInsight({
+        match_id: "matchwork-demo-001",
+        as_of_seconds: replay.elapsedSeconds,
+        audience,
+      });
+      setAiResponse({ key, result });
+      if (result.source !== "foundry") {
+        setPublicAiNotice(`AI preview is unavailable (${result.status}). Replay and evidence-based recaps remain accessible.`);
+      }
+    } catch (error) {
+      setPublicAiNotice(error instanceof Error ? error.message : "AI preview could not be reached");
+    } finally {
+      setPublicAiBusy(false);
+    }
+  };
 
   const isPlaying = replay.status === "playing";
     
@@ -293,7 +318,7 @@ useEffect(() => {
   const momentStory = latestMoment
     ? `${describeEvent(latestMoment)} at ${formatClock(latestMoment.elapsedSeconds)}${momentActor ? `, involving ${momentActor.player.name} (#${momentActor.player.shirtNumber}) of ${momentActor.team.name}` : ""}.`
     : "Start the replay to discover the biggest moments.";
-  const aiStory = visibleAiInsight && visibleAiInsight.explanation !== recap ? visibleAiInsight.explanation : null;
+  const aiStory = visibleAiInsight?.source === "foundry" && visibleAiInsight.explanation !== recap ? visibleAiInsight.explanation : null;
   const storyText = isAnalyst
     ? visibleAiInsight?.explanation ?? (replay.status === "playing" ? "Pause replay to request Foundry explanation." : recap)
     : aiStory ?? momentStory;
@@ -420,22 +445,31 @@ useEffect(() => {
         </motion.div>
 
         {match.metadata.id === demoMatch.id && (
-          <section className="card" aria-label="Optional Foundry demonstration access">
+          <section className="card" aria-label="Microsoft Foundry narrative preview">
             <div className="card-head">
-              <div><span className="eyebrow">Optional AI demonstration</span><h2>Microsoft Foundry narration</h2></div>
-              <span className="count">{operatorReady ? "Operator session active" : "Rules-based mode"}</span>
+              <div><span className="eyebrow">AI insight · Original fixture</span><h2>Microsoft Foundry narration</h2></div>
+              <span className="count">Public preview · No sign-in</span>
             </div>
-            {operatorReady ? (
-              <p>Operator session enabled. Pause the original fixture to request a budgeted, evidence-verified Foundry explanation. A labelled fallback remains available.</p>
-            ) : (
-              <form onSubmit={(event) => { event.preventDefault(); void enableOperatorAI(); }}>
-                <p>Replay and ONNX work without access. Enter the project operator code to enable protected Foundry narration.</p>
-                <label htmlFor="operator-demo-code">Operator access code</label>
-                <input id="operator-demo-code" type="password" autoComplete="off" value={operatorCode} onChange={(e) => setOperatorCode(e.target.value)} required minLength={32} maxLength={256} />
-                <button className="btn btn-secondary btn-sm" type="submit" disabled={operatorBusy || operatorCode.length < 32}>{operatorBusy ? "Connecting…" : "Enable Foundry demo"}</button>
-                {operatorError && <p role="alert">{operatorError}</p>}
-              </form>
-            )}
+            <p>Pause the match at any moment, then generate an evidence-linked Foundry narrative. No API key or login is required. The demo has a limited shared quota; replay, ONNX and recaps always remain available.</p>
+            <button type="button" className="btn btn-primary btn-sm" disabled={publicAiBusy || replay.status === "playing" || !frame.latestEvent}
+              onClick={() => { void generatePublicNarrative(); }}>
+              {publicAiBusy ? "Generating AI insight…" : "Generate AI narrative"}
+            </button>
+            {publicAiNotice && <p role="status">{publicAiNotice}</p>}
+            <details>
+              <summary>Project operator access (optional)</summary>
+              {operatorReady ? (
+                <p>Operator session active. Paused moments also request the authenticated specialist workflow.</p>
+              ) : (
+                <form onSubmit={(event) => { event.preventDefault(); void enableOperatorAI(); }}>
+                  <p>For project owners: sign in for the separately authenticated operator workflow.</p>
+                  <label htmlFor="operator-demo-code">Operator access code</label>
+                  <input id="operator-demo-code" type="password" autoComplete="off" value={operatorCode} onChange={(e) => setOperatorCode(e.target.value)} required minLength={32} maxLength={256} />
+                  <button className="btn btn-secondary btn-sm" type="submit" disabled={operatorBusy || operatorCode.length < 32}>{operatorBusy ? "Connecting…" : "Enable operator mode"}</button>
+                  {operatorError && <p role="alert">{operatorError}</p>}
+                </form>
+              )}
+            </details>
           </section>
         )}
         <motion.section className="card phase8-fixtures" variants={enter} aria-label="Choose a fictional match">
