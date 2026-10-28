@@ -21,7 +21,7 @@ COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend ./backend
-COPY --from=frontend /app/backend/data/replay.json ./backend/data/replay.json
+COPY --from=frontend /app/backend/data/ ./backend/data/
 COPY --from=frontend /app/dist ./dist
 
 ENV PYTHONUNBUFFERED=1
