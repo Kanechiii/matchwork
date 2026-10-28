@@ -97,6 +97,28 @@ class PublicPreviewTests(unittest.TestCase):
         self.assertTrue(1 <= len(calls[0][0]["evidence_ids"]) <= 5)
         self.assertEqual(first.json()["evidence_ids"], calls[0][0]["evidence_ids"])
 
+    def test_recent_prior_cache_reused_without_future_evidence(self):
+        async def model(evidence, audience, fallback):
+            return {
+                "source": "foundry",
+                "explanation": "Verified earlier synthetic match events.",
+                "evidence_ids": evidence["evidence_ids"],
+                "status": "success", "model_calls": 2, "trace": [],
+            }
+
+        with patch("backend.main.orchestrate_foundry_insight", new=AsyncMock(side_effect=model)) as invoke:
+            first = self.request()
+            nearby = self.request(payload={**PAYLOAD, "as_of_seconds": 1140})
+            older = self.request(payload={**PAYLOAD, "as_of_seconds": 1800})
+
+        self.assertEqual(first.json()["as_of_seconds"], 900)
+        self.assertEqual(nearby.json()["source"], "foundry")
+        self.assertEqual(nearby.json()["as_of_seconds"], 900)
+        self.assertEqual(nearby.json()["evidence_ids"], first.json()["evidence_ids"])
+        self.assertEqual(older.json()["as_of_seconds"], 1800)
+        self.assertEqual(invoke.await_count, 2)
+
+
     def test_origin_and_schema_rejected(self):
         self.assertEqual(self.request(origin="https://external.example").status_code, 403)
         self.assertEqual(self.request(origin="").status_code, 403)
@@ -121,9 +143,9 @@ class PublicPreviewTests(unittest.TestCase):
             "backend.main.orchestrate_foundry_insight", new=AsyncMock(side_effect=model)
         ) as invoke:
             self.assertEqual(self.request().json()["source"], "foundry")
-            limited = self.request(payload={**PAYLOAD, "as_of_seconds": 1200}).json()
+            limited = self.request(payload={**PAYLOAD, "as_of_seconds": 1800}).json()
             self.assertEqual(limited["source"], "rule-based")
-            self.assertEqual(limited["status"], "ai_hourly_limited")
+            self.assertEqual(limited["status"], "public_ai_hourly_limited")
             self.assertEqual(invoke.await_count, 1)
 
 
