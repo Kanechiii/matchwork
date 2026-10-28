@@ -800,7 +800,24 @@ const digit = {
   exit: { y: "70%", opacity: 0, transition: { duration: 0.2, ease: EASE_IN } },
 } as const;
 
+const PAGES_LIVE_STUDIO = "https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/#/studio";
+
 function App() {
+  // GitHub Pages serves only static files. The paid, evidence-audited Foundry
+  // API intentionally accepts requests from the trusted Azure app origin only.
+  // Open the fully functional studio on Azure, never from Pages' /api path.
+  useEffect(() => {
+    if (import.meta.env.BASE_URL !== "/matchwork/") return;
+    const redirectStudio = () => {
+      if (window.location.hash.startsWith("#/studio")) {
+        window.location.replace(PAGES_LIVE_STUDIO);
+      }
+    };
+    redirectStudio();
+    window.addEventListener("hashchange", redirectStudio);
+    return () => window.removeEventListener("hashchange", redirectStudio);
+  }, []);
+
   const [selectedFixture, setSelectedFixture] = useState(leagueFixtures[0].id);
   const activeFixture = leagueFixtures.find(f => f.id === selectedFixture) ?? leagueFixtures[0];
   const [page, setPage] = useState<"landing" | "studio">(
