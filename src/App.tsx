@@ -148,8 +148,8 @@ const [modelError, setModelError] = useState("");
   // Playback is free of paid requests; 700ms debounce avoids scrub bursts.
   // Each audience/minute shares one in-tab result, and Azure Redis also caches it.
   useEffect(() => {
-    if (!hasReplayInteracted || match.metadata.id !== demoMatch.id || isPlaying) return;
-    const key = `${sampleTime}:${audience}`;
+    if (!hasReplayInteracted || isPlaying) return;
+    const key = `${match.metadata.id}:${sampleTime}:${audience}`;
     const existing = narrativeCache.current.get(key);
     if (existing) {
       setAiResponse({ sampleTime, audience, result: existing });
@@ -162,7 +162,7 @@ const [modelError, setModelError] = useState("");
     setAiError("");
     const timer = window.setTimeout(() => {
       requestPublicMatchInsight({
-        match_id: "matchwork-demo-001",
+        match_id: match.metadata.id,
         as_of_seconds: sampleTime,
         audience,
       }, controller.signal)
@@ -259,9 +259,7 @@ const [modelError, setModelError] = useState("");
           : visibleAiInsight.status === "public_ai_daily_limited" || visibleAiInsight.status === "ai_daily_limited"
             ? "AI daily allowance reached · event-based fallback"
             : `Foundry unavailable (${visibleAiInsight.status}) · event-based fallback`
-    : aiError || (match.metadata.id !== demoMatch.id
-      ? "This fixture uses event-based recaps and in-browser ONNX insights"
-      : "Event-based story · Foundry narration appears automatically after seeking or pausing");
+    : aiError || "Event-based story · Foundry narration appears automatically after seeking or pausing";
   const possessionWins = match.events.filter((event) => event.type === "possession_change" && event.elapsedSeconds <= replay.elapsedSeconds);
   const recapTiles = [
     { label: "Goals", home: home.goals, away: away.goals },
@@ -393,7 +391,7 @@ const [modelError, setModelError] = useState("");
           </div>
           <FixturePicker fixtures={leagueFixtures} value={selectedFixture} onChange={onSelectFixture} featuredId={demoMatch.id} />
           <FixtureStrip fixtures={leagueFixtures} teams={leagueTeams} value={selectedFixture} onChange={onSelectFixture} />
-          {match.metadata.id !== demoMatch.id && <p className="phase8-notice">This synthetic fixture supports replay, in-browser model insights and player stats. Secure Foundry narration is limited to the canonical original match until the server ledger is expanded.</p>}
+          <p className="phase8-notice">All nine synthetic fixtures support evidence-linked Microsoft Foundry narration when paused or seeking, subject to the shared judging-period AI budget.</p>
         </motion.section>
 
         <motion.section className="card scoreboard" aria-label="Match scoreboard and replay" variants={enter}>
