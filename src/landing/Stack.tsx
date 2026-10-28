@@ -1,3 +1,4 @@
+import { ScrollHeading } from "./ScrollMotion";
 import { useRef, useState, type ComponentType } from "react";
 import { motion } from "motion/react";
 import { Activity, Cloud, Container, Cpu, Database, GitBranch, Globe, LockKeyhole, MessageSquareText, Plus, Wallet, Workflow } from "lucide-react";
@@ -173,7 +174,7 @@ export function Stack() {
   return (
     <section className="lp-section lp-stack" id="stack" aria-labelledby="stack-title">
       <motion.div className="lp-section-head" {...reveal()}>
-        <h2 id="stack-title">The technology behind Matchwork.</h2>
+        <ScrollHeading id="stack-title" text="The technology behind Matchwork." />
         <p>See the specific role each Microsoft AI product, Azure service and delivery tool plays in the project. Open a card for the implementation details; optional integrations are clearly marked.</p>
       </motion.div>
       {GROUPS.map((group) => (

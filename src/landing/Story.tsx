@@ -1,3 +1,4 @@
+import { ScrollHeading } from "./ScrollMotion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView, useMotionValueEvent, useScroll, useTransform } from "motion/react";
 import type { MatchEvent, SyntheticMatch } from "../types/match";
@@ -161,7 +162,7 @@ export function Story({ match, sample, model }: { match: SyntheticMatch; sample:
   return (
     <section className="lp-story" id="story" ref={ref} aria-labelledby="story-title">
       <div className="lp-story-intro">
-        <h2 id="story-title">How a moment becomes an insight.</h2>
+        <ScrollHeading id="story-title" text="How a moment becomes an insight." />
         <p>Scroll through one moment of the demo fixture, from raw events to an explanation you can check. The same pipeline applies to any team and any match.</p>
       </div>
       <div className="lp-story-grid">

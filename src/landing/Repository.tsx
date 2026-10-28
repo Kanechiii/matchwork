@@ -1,3 +1,4 @@
+import { ScrollHeading, WipeReveal } from "./ScrollMotion";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { BookOpen, Check, Copy, ExternalLink, FileText, Folder, FolderOpen } from "lucide-react";
@@ -111,7 +112,7 @@ export function Repository() {
     <section className="lp-section lp-repo" id="repository" aria-labelledby="repo-title">
       <motion.div className="lp-section-head" {...reveal()}>
         <div>
-          <h2 id="repo-title">Explore the repository.</h2>
+          <ScrollHeading id="repo-title" text="Explore the repository." />
           <div className="lp-repo-links">
             <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer">View on GitHub <ExternalLink aria-hidden="true" /></a>
             <a className="btn btn-secondary" href={blob("docs/README.md")} target="_blank" rel="noreferrer"><BookOpen aria-hidden="true" /> Documentation</a>
@@ -121,7 +122,7 @@ export function Repository() {
       </motion.div>
 
       <div className="lp-repo-grid">
-        <motion.div className="lp-explorer" {...reveal(0.05)}>
+        <WipeReveal className="lp-explorer">
           <div className="lp-explorer-head"><span>Kanechiii / matchwork</span><span>main</span></div>
           <div className="lp-explorer-body">
             <ul className="lp-tree" role="list" aria-label="Repository folders">
@@ -165,9 +166,9 @@ export function Repository() {
               </AnimatePresence>
             </div>
           </div>
-        </motion.div>
+        </WipeReveal>
 
-        <motion.div className="lp-quickstart" {...reveal(0.12)}>
+        <WipeReveal className="lp-quickstart">
           <div className="lp-quickstart-head">
             <h3>Run it locally</h3>
             <Segmented id="lp-qs" label="Quick start target" size="sm" value={qs} onChange={setQs}
@@ -180,7 +181,7 @@ export function Repository() {
             <CopyButton text={commands} />
           </div>
           <p className="lp-quickstart-note">Requires Node.js 24, npm and Python 3.12+. The replay and rules-based recap work without paid AI credentials; keep <code>MATCHWORK_AI_ENABLED=false</code> until server-side safeguards are configured.</p>
-        </motion.div>
+        </WipeReveal>
       </div>
     </section>
   );
