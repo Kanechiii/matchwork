@@ -1,3 +1,4 @@
+import { ScrollHeading, WipeReveal } from "./ScrollMotion";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView } from "motion/react";
 import { ChartColumn, Users } from "lucide-react";
@@ -28,7 +29,7 @@ export function Views({ match, sample, model }: { match: SyntheticMatch; sample:
     <section className="lp-section lp-views" id="views" ref={ref} aria-labelledby="views-title">
       <div className="lp-views-grid">
         <motion.div className="lp-views-copy" {...reveal()}>
-          <h2 id="views-title">Detailed insight for every team, at the depth you need.</h2>
+          <ScrollHeading id="views-title" text="Detailed insight for every team, at the depth you need." />
           <p>Follow both sides or pick the team you care about, and the explanation re-targets to them. Fan view keeps the game human; Analyst view opens up the scores, features and event IDs behind the same explanation.</p>
           <div className="lp-views-controls">
             <Segmented id="lp-mode" label="Choose a view" value={mode} onChange={setMode} options={[
@@ -39,7 +40,7 @@ export function Views({ match, sample, model }: { match: SyntheticMatch; sample:
           <p className="lp-views-note">Generated live in your browser by the studio's own explanation code for {clock(sample.time)}.{ready ? "" : model.status === "unavailable" ? " The ONNX model could not load here, so you see the honest unavailable state." : " Loading the ONNX model…"}</p>
         </motion.div>
 
-        <motion.article className={`lp-view-card is-${mode}`} {...reveal(0.1)} aria-live="polite">
+        <WipeReveal as="article" className={`lp-view-card is-${mode}`} aria-live="polite">
           <header className="lp-view-card-head">
             <span>{mode === "fan" ? "What's happening?" : "Match intelligence"}</span>
             <span className="tabular">{clock(sample.time)}</span>
@@ -76,7 +77,7 @@ export function Views({ match, sample, model }: { match: SyntheticMatch; sample:
               )}
             </motion.div>
           </AnimatePresence>
-        </motion.article>
+        </WipeReveal>
       </div>
     </section>
   );

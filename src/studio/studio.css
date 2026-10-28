@@ -39,31 +39,33 @@
 .fixture-check { width: 18px; height: 18px; flex-shrink: 0; color: var(--accent); }
 
 /* ---------- Fixture rail (scrollbar hidden; arrows, swipe and wheel still scroll) ---------- */
-.fixture-browser { display: grid; gap: 10px; }
+.fixture-browser { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
 .club-filter, .metric-picker { display: flex; flex-wrap: wrap; gap: 6px; }
 .club-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-2); font-size: 12px; font-weight: 600; white-space: nowrap; transition: background-color .15s, border-color .15s, color .15s; }
 .club-chip:hover { border-color: var(--border-strong); background: var(--surface-2); color: var(--text); }
 .club-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
 .club-chip .team-crest { margin-left: -5px; }
-.fixture-rail { display: flex; align-items: center; gap: 6px; }
-.fixture-scroller { position: relative; flex: 1; min-width: 0; display: flex; gap: 8px; padding: 4px 3px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: 4px; overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none; }
+/* Bound the fixture rail to its card: edge fades previously obscured team crests
+   and made partially visible match cards appear to overlap the container. */
+.phase8-fixtures { min-width: 0; }
+.fixture-browser { width: 100%; max-width: 100%; }
+.fixture-rail { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+.fixture-scroller { position: relative; width: 100%; min-width: 0; display: flex; gap: 8px; padding: 6px 10px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; scroll-padding-inline: 10px; overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none; }
 .fixture-scroller::-webkit-scrollbar { display: none; }
-.fixture-rail.has-start .fixture-scroller { -webkit-mask-image: linear-gradient(to right, transparent, black 36px); mask-image: linear-gradient(to right, transparent, black 36px); }
-.fixture-rail.has-end .fixture-scroller { -webkit-mask-image: linear-gradient(to left, transparent, black 36px); mask-image: linear-gradient(to left, transparent, black 36px); }
-.fixture-rail.has-start.has-end .fixture-scroller { -webkit-mask-image: linear-gradient(to right, transparent, black 36px, black calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, black 36px, black calc(100% - 36px), transparent); }
+/* Arrows remain outside the clipping region; no opacity mask overlays team tiles. */
 .rail-btn { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-1); transition: opacity .15s, background-color .15s, color .15s; }
 .rail-btn:hover:not(:disabled) { background: var(--sunken); color: var(--text); }
 .rail-btn:disabled { opacity: .35; cursor: default; }
 .rail-btn svg { width: 16px; height: 16px; }
-.fixture-card { flex: 0 0 188px; scroll-snap-align: start; display: grid; gap: 10px; padding: 12px; text-align: left; border: 1px solid var(--border); border-radius: var(--radius-l); background: var(--surface); transition: transform .18s, border-color .18s, background-color .18s, box-shadow .18s; }
+.fixture-card { flex: 0 0 auto; min-width: 188px; scroll-snap-align: start; display: grid; gap: 10px; padding: 12px; text-align: left; border: 1px solid var(--border); border-radius: var(--radius-l); background: var(--surface); transition: transform .18s, border-color .18s, background-color .18s, box-shadow .18s; }
 .fixture-card:hover { transform: translateY(-2px); border-color: var(--border-strong); box-shadow: var(--shadow-1); }
 .fixture-card.is-selected { border-color: var(--accent); background: var(--accent-soft); }
 .fixture-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px; }
 .fixture-card-top small { font-size: 11px; font-weight: 600; color: var(--text-3); }
 .fixture-viewing { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--accent-text); }
 .fixture-viewing .status-dot { width: 6px; height: 6px; background: var(--accent); }
-.fixture-card-teams { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.fixture-card-team { display: inline-flex; align-items: center; gap: 7px; }
+.fixture-card-teams { display: flex; align-items: center; justify-content: space-between; gap: 10px; white-space: nowrap; }
+.fixture-card-team { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; }
 .fixture-card-team strong { font-size: 14px; font-weight: 700; letter-spacing: .02em; }
 .fixture-card-vs { font-size: 11px; color: var(--text-3); }
 
@@ -320,7 +322,7 @@
 @media (max-width: 560px) {
   /* Icon-only view switcher; labels stay available to assistive tech. */
   .statview .sv-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .fixture-card { flex-basis: 164px; }
+  .fixture-card { min-width: 164px; }
   .rail-btn { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -1,3 +1,4 @@
+import { ScrollHeading, WipeReveal } from "./landing/ScrollMotion";
 import { useEffect, useState } from "react";
 import { motion, useScroll, useSpring } from "motion/react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
@@ -9,6 +10,7 @@ import { Story } from "./landing/Story";
 import { Views } from "./landing/Views";
 import { Stack } from "./landing/Stack";
 import { Repository } from "./landing/Repository";
+import { Team } from "./landing/Team";
 import { useSampleModel, useSampleMoment } from "./landing/sample";
 import { EASE_OUT, STAGGER, reveal } from "./motion";
 import "./LandingPage.css";
@@ -23,6 +25,7 @@ const NAV = [
   { id: "stack", label: "Microsoft stack" },
   { id: "repository", label: "Repository" },
   { id: "transparency", label: "Transparency" },
+  { id: "team", label: "Team" },
 ];
 
 // From the README's Security, Cost and Limitations section and docs/.
@@ -87,7 +90,7 @@ function LandingPage({ match }: LandingPageProps) {
 
         <section className="lp-section lp-transparency" id="transparency" aria-labelledby="transparency-title">
           <motion.div className="lp-section-head" {...reveal()}>
-            <h2 id="transparency-title">Built to show its working.</h2>
+            <ScrollHeading id="transparency-title" text="Built to show its working." />
             <p>An explanation is only useful if you know where it came from and where it stops.</p>
           </motion.div>
           <dl className="lp-principles">
@@ -99,13 +102,15 @@ function LandingPage({ match }: LandingPageProps) {
           </dl>
         </section>
 
-        <motion.section className="lp-close" aria-labelledby="close-title" {...reveal(0, 32)}>
+        <Team />
+
+        <WipeReveal as="section" className="lp-close" aria-labelledby="close-title">
           <div>
-            <h2 id="close-title">Don't just watch the game. Read it.</h2>
-            <p>Pick any moment of the demo fixture and read it in Fan or Analyst view. No account needed.</p>
+            <ScrollHeading id="close-title" text="Don't just watch the game. Read it." />
+            <p>Choose from nine fictional fixtures, follow the action, and explore player statistics in Fan or Analyst view. No account needed.</p>
           </div>
           <a href="#/studio" className="btn btn-primary btn-lg">Open the match studio <ArrowRight aria-hidden="true" /></a>
-        </motion.section>
+        </WipeReveal>
       </main>
 
       <footer className="lp-footer">

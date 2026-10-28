@@ -1,3 +1,4 @@
+import { ScrollHeading, WipeReveal } from "./ScrollMotion";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { BookOpen, Check, Copy, ExternalLink, FileText, Folder, FolderOpen } from "lucide-react";
@@ -12,11 +13,19 @@ interface Entry { path: string; title: string; summary: string; files: { name: s
 
 // Mirrors the repository layout on main.
 const ENTRIES: Entry[] = [
-  { path: "src", title: "Web app", summary: "React and TypeScript front end: the seeded match engine, rolling features, in-browser ONNX inference, explanations, the studio and this page.",
+  { path: "src", title: "Web app", summary: "React and TypeScript app with six fictional clubs, nine deterministic fixtures, 66 player profiles, interactive studio, charts, browser ONNX, and landing page.",
     files: [
       { name: "engine/generateEvents.ts", note: "Seeded, reproducible event generator" },
       { name: "engine/replay.ts", note: "Replay clock and frames" },
-      { name: "engine/calculateStats.ts", note: "As-of match statistics" },
+      { name: "engine/calculateStats.ts", note: "As-of team statistics" },
+      { name: "engine/calculatePlayerStats.ts", note: "Evidence-linked player and season aggregates" },
+      { name: "data/league.ts", note: "Six-club, nine-fixture synthetic league" },
+      { name: "studio/Fixtures.tsx", note: "Interactive match picker and club filters" },
+      { name: "studio/PlayerBoard.tsx", note: "Searchable player cards and profile overlays" },
+      { name: "studio/ActionPitch.tsx", note: "Interactive event and player pitch positions" },
+      { name: "studio/StatCharts.tsx", note: "Comparison, trend and momentum charts" },
+      { name: "components/TeamCrest.tsx", note: "Fictional club emblems" },
+      { name: "components/PlayerAvatar.tsx", note: "Deterministic synthetic player portraits" },
       { name: "ai/features.ts", note: "Rolling three-minute features" },
       { name: "ai/inference.ts", note: "ONNX Runtime Web loader" },
       { name: "ai/explanations.ts", note: "Fan and Analyst explanations" },
@@ -37,7 +46,11 @@ const ENTRIES: Entry[] = [
       { name: "exportReplay.mjs", note: "Exports the canonical replay ledger" },
       { name: "verifyReplay.mjs", note: "Replay clock and seeking" },
       { name: "verifyStats.mjs", note: "Statistics reconcile with events" },
+      { name: "verifyLeague.mjs", note: "Nine-fixture player statistics regression" },
+      { name: "verifyPagesBuild.mjs", note: "Static preview asset paths" },
       { name: "verifyIntelligence.mjs", note: "No future data in features or recaps" },
+      { name: "verifyEnterprise.mjs", note: "Security and integrity checks" },
+      { name: "verifyWorkflow.mjs", note: "Agent workflow checks" },
       { name: "verifyOnnxRuntime.mjs", note: "Model loads and answers" },
       { name: "train_match_state.py", note: "Rebuilds the synthetic classifier" },
     ] },
@@ -46,12 +59,14 @@ const ENTRIES: Entry[] = [
       { name: "README.md", note: "Documentation index" },
       { name: "DEPLOYMENT_CURRENT.md", note: "Current Azure deployment" },
       { name: "RELEASE_CHECKLIST.md", note: "Submission gates and storyboard" },
+      { name: "PROJECT_PHASE_ROADMAP.md", note: "Project progress and multi-team roadmap" },
+      { name: "DOCUMENTATION_STYLE.md", note: "Documentation structure and conventions" },
       { name: "PHASE7B_API_SECURITY.md", note: "Protected API and trusted fixture" },
       { name: "FOUNDRY_MULTI_AGENT.md", note: "Two-agent workflow" },
       { name: "FOUNDRY_EVALUATION_OBSERVABILITY.md", note: "Evaluation and tracing" },
       { name: "PHASE7E_SHARED_BUDGET.md", note: "Shared Redis budget" },
     ] },
-  { path: ".github/workflows", title: "Automation", summary: "GitHub Actions that run every quality check and publish the container image.",
+  { path: ".github/workflows", title: "Automation", summary: "GitHub Actions for code quality, build verification, container publishing, and manual static preview publishing.",
     files: [
       { name: "quality.yml", note: "Build, lint, backend tests and verification" },
       { name: "publish-ghcr.yml", note: "Container image to GHCR" },
@@ -97,17 +112,17 @@ export function Repository() {
     <section className="lp-section lp-repo" id="repository" aria-labelledby="repo-title">
       <motion.div className="lp-section-head" {...reveal()}>
         <div>
-          <h2 id="repo-title">Explore the repository.</h2>
+          <ScrollHeading id="repo-title" text="Explore the repository." />
           <div className="lp-repo-links">
             <a className="btn btn-primary" href={REPO} target="_blank" rel="noreferrer">View on GitHub <ExternalLink aria-hidden="true" /></a>
             <a className="btn btn-secondary" href={blob("docs/README.md")} target="_blank" rel="noreferrer"><BookOpen aria-hidden="true" /> Documentation</a>
           </div>
         </div>
-        <p>Everything behind the insight system is open: the match engine, the in-browser model, the protected API, the checks that keep it honest and the guides that document what is verified.</p>
+        <p>Browse the complete implementation: synthetic league fixtures, event-derived player intelligence, interactive visualizations, in-browser ONNX, protected Foundry APIs, reproducibility checks, and deployment documentation.</p>
       </motion.div>
 
       <div className="lp-repo-grid">
-        <motion.div className="lp-explorer" {...reveal(0.05)}>
+        <WipeReveal className="lp-explorer">
           <div className="lp-explorer-head"><span>Kanechiii / matchwork</span><span>main</span></div>
           <div className="lp-explorer-body">
             <ul className="lp-tree" role="list" aria-label="Repository folders">
@@ -151,9 +166,9 @@ export function Repository() {
               </AnimatePresence>
             </div>
           </div>
-        </motion.div>
+        </WipeReveal>
 
-        <motion.div className="lp-quickstart" {...reveal(0.12)}>
+        <WipeReveal className="lp-quickstart">
           <div className="lp-quickstart-head">
             <h3>Run it locally</h3>
             <Segmented id="lp-qs" label="Quick start target" size="sm" value={qs} onChange={setQs}
@@ -166,7 +181,7 @@ export function Repository() {
             <CopyButton text={commands} />
           </div>
           <p className="lp-quickstart-note">Requires Node.js 24, npm and Python 3.12+. The replay and rules-based recap work without paid AI credentials; keep <code>MATCHWORK_AI_ENABLED=false</code> until server-side safeguards are configured.</p>
-        </motion.div>
+        </WipeReveal>
       </div>
     </section>
   );
