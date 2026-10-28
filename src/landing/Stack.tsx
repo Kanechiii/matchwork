@@ -1,6 +1,6 @@
 import { useRef, useState, type ComponentType } from "react";
 import { motion } from "motion/react";
-import { Activity, Container, Cpu, Database, GitBranch, MessageSquareText, Plus, Workflow } from "lucide-react";
+import { Activity, Cloud, Container, Cpu, Database, GitBranch, Globe, LockKeyhole, MessageSquareText, Plus, Workflow } from "lucide-react";
 import { EASE_IN, EASE_OUT, reveal } from "../motion";
 
 interface Product {
@@ -9,40 +9,38 @@ interface Product {
   status: string;
   purpose: string;
   detail: string;
-  limit: string;
 }
 
-// Facts from the README and docs/. Each card keeps its limit next to its claim.
+// Products and deployment roles verified against the repository README and deployment documentation.
 const GROUPS: { title: string; note: string; tone: "ai" | "platform"; products: Product[] }[] = [
   {
     title: "AI that explains the game", note: "Where the insight comes from", tone: "ai",
     products: [
       { name: "Microsoft Foundry", icon: MessageSquareText, status: "Server-side · opt-in", purpose: "Writes Fan and Analyst explanations from verified match evidence.",
-        detail: "When you pause, the protected API can ask a Foundry model to explain the moment for your audience. It only sees evidence the server has verified, and answers cite event IDs. Otherwise a labelled rules-based fallback is returned.",
-        limit: "A recap on screen alone does not prove a live model call ran." },
+        detail: "When you pause, the protected API can ask a Foundry model to explain the moment for your audience. It only sees evidence the server has verified, and answers cite event IDs. Otherwise a labelled rules-based fallback is returned." },
       { name: "Microsoft Agent Framework", icon: Workflow, status: "Opt-in · off by default", purpose: "Coordinates a two-agent explanation workflow.",
-        detail: "A Tactical Analyst agent proposes an observation, a Narrative Agent writes it for fans or analysts, and a local Evidence Auditor checks citations at every handoff, failing closed if any are out of scope.",
-        limit: "Off by default; the public UI does not call it." },
+        detail: "A Tactical Analyst agent proposes an observation, a Narrative Agent writes it for fans or analysts, and a local Evidence Auditor checks citations at every handoff, failing closed if any are out of scope." },
       { name: "ONNX Runtime Web", icon: Cpu, status: "Runs in your browser", purpose: "Classifies each spell as control, pressure or transition.",
-        detail: "An embedded classifier runs on WebAssembly through a version-pinned onnxruntime-web build, reading seven rolling three-minute features every 15 seconds of match time. No server call is needed.",
-        limit: "Trained on synthetic prototypes; scores are illustrative." },
+        detail: "An embedded classifier runs on WebAssembly through a version-pinned onnxruntime-web build, reading seven rolling three-minute features every 15 seconds of match time. No server call is needed." },
     ],
   },
   {
     title: "Platform that runs it", note: "Hosting, budget, telemetry and delivery", tone: "platform",
     products: [
       { name: "Azure Container Apps", icon: Container, status: "Hosts the secure demo", purpose: "Runs the insight API and the web app.",
-        detail: "One two-stage Docker image serves the web app and the Python API in Japan East, inside a private virtual network. Tokens arrive as secret references, never baked into the image.",
-        limit: "A verified hackathon deployment, not a production SLA." },
+        detail: "One two-stage Docker image serves the web app and the Python API in Japan East, inside a private virtual network. Tokens arrive as secret references, never baked into the image." },
       { name: "Azure Managed Redis", icon: Database, status: "On the secure demo", purpose: "Shares the paid AI attempt budget across replicas.",
-        detail: "Every paid model call first reserves an hourly and daily attempt with an atomic script over a private TLS endpoint. If Redis is unreachable, AI calls fail closed into the fallback.",
-        limit: "Limits this app's attempts; not a hard billing cap." },
+        detail: "Every paid model call first reserves an hourly and daily attempt with an atomic script over a private TLS endpoint. If Redis is unreachable, AI calls fail closed into the fallback." },
+      { name: "Azure Virtual Network", icon: Globe, status: "Secure demo networking", purpose: "Connects the application to private Azure resources.",
+        detail: "The Japan East secure deployment uses a dedicated virtual network and Container Apps subnet. This network separates the app's private infrastructure from its public web entry point." },
+      { name: "Azure Private Link", icon: LockKeyhole, status: "Private Redis endpoint", purpose: "Keeps the Redis budget service on private connectivity.",
+        detail: "Managed Redis is reached through a private endpoint with TLS and hostname validation. The backend uses cluster-aware address remapping so it can reach Redis shards without turning off certificate checks." },
       { name: "Azure Monitor Application Insights", icon: Activity, status: "Optional · off by default", purpose: "Traces each specialist agent step.",
-        detail: "When enabled, OpenTelemetry spans for each specialist agent are exported at 10% sampling. Prompts, responses, match details and credentials are never attached.",
-        limit: "Off unless tracing is switched on; check monitoring cost first." },
+        detail: "When enabled, OpenTelemetry spans for each specialist agent are exported at 10% sampling. Prompts, responses, match details and credentials are never attached." },
       { name: "GitHub Actions and GHCR", icon: GitBranch, status: "Builds and ships", purpose: "Checks every change and publishes the container image.",
-        detail: "The quality workflow builds and lints the app and runs replay, statistics, ONNX, enterprise and workflow checks plus backend tests. A publish workflow pushes the image to GitHub Container Registry.",
-        limit: "Passing CI proves the checks, not production behaviour." },
+        detail: "The quality workflow builds and lints the app and runs replay, statistics, ONNX, enterprise and workflow checks plus backend tests. A publish workflow pushes the image to GitHub Container Registry." },
+      { name: "GitHub Pages", icon: Cloud, status: "Manual preview workflow", purpose: "Builds a standalone static preview of the web experience.",
+        detail: "A manually triggered GitHub Pages workflow builds with the /matchwork/ subpath. Quality checks verify its asset paths; this complements the secure Azure Container Apps demo." },
     ],
   },
 ];
@@ -89,7 +87,6 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
           {[
             <h4 key="h">{product.name}</h4>,
             <p key="d">{product.detail}</p>,
-            <p key="l" className="lp-product-limit"><strong>Limit:</strong> {product.limit}</p>,
           ].map((node) => (
             <motion.div key={node.key} variants={{ open: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE_OUT } }, closed: { opacity: 0, y: 8, transition: { duration: 0.12 } } }}>
               {node}
@@ -106,7 +103,7 @@ export function Stack() {
     <section className="lp-section lp-stack" id="stack" aria-labelledby="stack-title">
       <motion.div className="lp-section-head" {...reveal()}>
         <h2 id="stack-title">Built on Microsoft.</h2>
-        <p>The products that power the insight system and what each one is for. Hover, focus or tap a card for the full description and its limits.</p>
+        <p>Explore the Microsoft and GitHub services behind Matchwork, from in-browser intelligence to verified Azure infrastructure. Hover, focus or tap for more detail.</p>
       </motion.div>
       {GROUPS.map((group) => (
         <div key={group.title} className={`lp-stack-group is-${group.tone}`}>
