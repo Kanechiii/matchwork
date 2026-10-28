@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { Activity, BookOpen, ChartColumn, ChartColumnBig, ChartSpline, ChevronDown, CircleAlert, Info, ListChecks, Pause, Play, RefreshCw, RotateCcw, SlidersHorizontal, Users, X } from "lucide-react";
 import type { MatchEvent } from "./types/match";
@@ -32,10 +32,7 @@ import { Segmented } from "./components/Segmented";
 import { TeamCrest } from "./components/TeamCrest";
 import { EASE_IN, EASE_OUT, SPRING_BAR, SPRING_UI, swap } from "./motion";
 import {
-  requestMatchInsight,
   requestPublicMatchInsight,
-  startOperatorSession,
-  hasOperatorSession,
   type MatchInsight,
 } from "./services/matchworkAI";
 import { buildRoster, describeEvent, formatClock } from "./studio/format";
@@ -70,40 +67,24 @@ function MatchStudio({ match, selectedFixture, onSelectFixture }: { match: typeo
   const roster = useMemo(() => buildRoster(match), [match]);
   const statTimeline = useMemo(() => buildStatTimeline(match), [match]);
   
+// Public model narration is sampled at the beginning of the observed minute.
+// This reuses verified responses when judges scrub around the same period,
+// while live playback always displays fresh rule-based event information.
+const sampleTime = Math.floor(replay.elapsedSeconds / 60) * 60;
 const [aiResponse, setAiResponse] = useState<{
-  key: string;
+  sampleTime: number;
+  audience: AudienceMode;
   result: MatchInsight;
 } | null>(null);
-
-const visibleKey =
-  `${replay.elapsedSeconds}:${replay.status}:${audience}`;
-
-const visibleAiInsight =
-  aiResponse?.key === visibleKey
-    ? aiResponse.result
-    : null;
-  const [modelStatus, setModelStatus] = useState<"loading" | "ready" | "unavailable">("loading");
-  const [modelError, setModelError] = useState("");
-  const [operatorCode, setOperatorCode] = useState("");
-  const [operatorReady, setOperatorReady] = useState(hasOperatorSession);
-  const [operatorError, setOperatorError] = useState("");
-  const [operatorBusy, setOperatorBusy] = useState(false);
-  const [publicAiBusy, setPublicAiBusy] = useState(false);
-  const [publicAiNotice, setPublicAiNotice] = useState("");
-  const enableOperatorAI = async () => {
-    if (operatorBusy || !operatorCode) return;
-    setOperatorBusy(true);
-    setOperatorError("");
-    try {
-      await startOperatorSession(operatorCode);
-      setOperatorReady(true);
-      setOperatorCode("");
-    } catch (error) {
-      setOperatorError(error instanceof Error ? error.message : "Operator access unavailable");
-    } finally {
-      setOperatorBusy(false);
-    }
-  };
+const [hasReplayInteracted, setHasReplayInteracted] = useState(false);
+const [aiLoading, setAiLoading] = useState(false);
+const [aiError, setAiError] = useState("");
+const narrativeCache = useRef(new Map<string, MatchInsight>());
+const visibleAiInsight = replay.status !== "playing" &&
+  aiResponse?.sampleTime === sampleTime && aiResponse.audience === audience
+    ? aiResponse.result : null;
+const [modelStatus, setModelStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+const [modelError, setModelError] = useState("");
   const insightWindow = Math.floor(replay.elapsedSeconds / 15);
   const modelSampleTime = insightWindow * 15;
   const [retryCount, setRetryCount] = useState(0);
@@ -161,102 +142,45 @@ const visibleAiInsight =
   const frame = getReplayFrame(match, replay);
   const { home, away } = frame.stats;
 
-  const generatePublicNarrative = async () => {
-    if (publicAiBusy || match.metadata.id !== demoMatch.id || replay.status === "playing" || !frame.latestEvent) return;
-    setPublicAiBusy(true);
-    setPublicAiNotice("");
-    const key = `${replay.elapsedSeconds}:${replay.status}:${audience}`;
-    try {
-      const result = await requestPublicMatchInsight({
-        match_id: "matchwork-demo-001",
-        as_of_seconds: replay.elapsedSeconds,
-        audience,
-      });
-      setAiResponse({ key, result });
-      if (result.source !== "foundry") {
-        setPublicAiNotice(`AI preview is unavailable (${result.status}). Replay and evidence-based recaps remain accessible.`);
-      }
-    } catch (error) {
-      setPublicAiNotice(error instanceof Error ? error.message : "AI preview could not be reached");
-    } finally {
-      setPublicAiBusy(false);
-    }
-  };
-
   const isPlaying = replay.status === "playing";
-    
-  
-useEffect(() => {
-  // Generate Foundry explanations only when paused
-  // or when the replay has finished.
-  if (replay.status === "playing") return;
 
-  const controller = new AbortController();
-
-  const currentFrame = getReplayFrame(match, replay);
-  const event = currentFrame.latestEvent;
-
-  if (!event || match.metadata.id !== demoMatch.id || !operatorReady) return;
-
-  const features = extractWindowFeatures(
-    match,
-    replay.elapsedSeconds
-  );
-
-  // Identifies the state this request belongs to.
-  const requestKey =
-    `${replay.elapsedSeconds}:${replay.status}:${audience}`;
-
-  const eventEvidence = {
-    match_id: demoMatch.id as "matchwork-demo-001",
-    as_of_seconds: replay.elapsedSeconds,
-    evidence_ids: features.eventIds.slice(-5),
-    audience,
-  };
-
-  const fallbackText = buildMatchRecap(
-    match,
-    replay.elapsedSeconds
-  );
-
-  const timer = window.setTimeout(() => {
-    requestMatchInsight(
-      eventEvidence,
-      controller.signal
-    )
-      .then((result) => {
-        if (controller.signal.aborted) return;
-
-        setAiResponse({
-          key: requestKey,
-          result
+  // Request only when a judge actively seeks, pauses or reaches full time.
+  // Playback is free of paid requests; 700ms debounce avoids scrub bursts.
+  // Each audience/minute shares one in-tab result, and Azure Redis also caches it.
+  useEffect(() => {
+    if (!hasReplayInteracted || match.metadata.id !== demoMatch.id || isPlaying) return;
+    const key = `${sampleTime}:${audience}`;
+    const existing = narrativeCache.current.get(key);
+    if (existing) {
+      setAiResponse({ sampleTime, audience, result: existing });
+      setAiLoading(false);
+      setAiError("");
+      return;
+    }
+    const controller = new AbortController();
+    setAiLoading(true);
+    setAiError("");
+    const timer = window.setTimeout(() => {
+      requestPublicMatchInsight({
+        match_id: "matchwork-demo-001",
+        as_of_seconds: sampleTime,
+        audience,
+      }, controller.signal)
+        .then((result) => {
+          if (controller.signal.aborted) return;
+          narrativeCache.current.set(key, result);
+          setAiResponse({ sampleTime, audience, result });
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setAiError("Foundry unavailable; event-based story remains available.");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setAiLoading(false);
         });
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-
-        console.error(
-          "Microsoft Foundry unavailable:",
-          error
-        );
-
-        setAiResponse({
-          key: requestKey,
-          result: {
-            source: "rule-based",
-            explanation: fallbackText,
-            evidence_ids: eventEvidence.evidence_ids,
-            status: "ai_unavailable"
-          }
-        });
-      });
-  }, 600);
-
-  return () => {
-    window.clearTimeout(timer);
-    controller.abort();
-  };
-}, [replay, audience, match, operatorReady]);
+    }, 700);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [hasReplayInteracted, match, isPlaying, sampleTime, audience]);
 
   const isAnalyst = audience === "analyst";
   const homeTeam = match.metadata.homeTeam;
@@ -270,7 +194,7 @@ useEffect(() => {
   const possessionTotal = Math.max(1, home.possessionPct + away.possessionPct);
   const homeShare = Math.round((home.possessionPct / possessionTotal) * 100);
   const visibleEvents = frame.recentEvents.slice().reverse();
-  const onSeek = (time: number) => setReplay((current) => seekReplay(current, match, time));
+  const onSeek = (time: number) => { setHasReplayInteracted(true); setReplay((current) => seekReplay(current, match, time)); };
 
   const playerStats = calculatePlayerStats(match, replay.elapsedSeconds);
   const leagueStats = aggregatePlayerStats(leagueFixtures.map(f => f.match));
@@ -294,7 +218,7 @@ useEffect(() => {
   const whyText = isAnalyst
     ? insight.whyItMatters
     : modelDisplayStatus === "ready" ? insight.whyItMatters : "Every update comes from events already shown in the replay.";
-  const sourceLabel = visibleAiInsight?.source === "foundry" ? "Microsoft Foundry" : visibleAiInsight?.source === "rule-based" ? "Rule based" : "Pending";
+  const sourceLabel = visibleAiInsight?.source === "foundry" ? "Microsoft Foundry" : "Rule based";
   const shotMarks = match.events.filter(
     (event): event is Extract<MatchEvent, { type: "shot" }> => event.type === "shot" && event.elapsedSeconds <= replay.elapsedSeconds,
   );
@@ -318,13 +242,18 @@ useEffect(() => {
   const momentStory = latestMoment
     ? `${describeEvent(latestMoment)} at ${formatClock(latestMoment.elapsedSeconds)}${momentActor ? `, involving ${momentActor.player.name} (#${momentActor.player.shirtNumber}) of ${momentActor.team.name}` : ""}.`
     : "Start the replay to discover the biggest moments.";
-  const aiStory = visibleAiInsight?.source === "foundry" && visibleAiInsight.explanation !== recap ? visibleAiInsight.explanation : null;
-  const storyText = isAnalyst
-    ? visibleAiInsight?.explanation ?? (replay.status === "playing" ? "Pause replay to request Foundry explanation." : recap)
-    : aiStory ?? momentStory;
-  const storyNote = isAnalyst
-    ? visibleAiInsight?.source === "foundry" ? "Microsoft Foundry response · backed by submitted observed event IDs" : visibleAiInsight?.source === "rule-based" ? "Foundry unavailable · deterministic fallback" : "Only events up to the replay clock are used"
-    : replay.status === "playing" ? "Pause on a moment for a deeper match story" : visibleAiInsight?.source === "foundry" ? "Expanded story ready" : "Showing the match story from observed events";
+  const storyText = visibleAiInsight?.source === "foundry"
+    ? visibleAiInsight.explanation
+    : isAnalyst ? recap : momentStory;
+  const storyNote = visibleAiInsight?.source === "foundry"
+    ? `Microsoft Foundry · synthetic evidence through ${formatClock(sampleTime)} · interpretation, not established intent`
+    : aiLoading ? `Generating evidence-linked narration through ${formatClock(sampleTime)}; showing observed events meanwhile`
+    : isPlaying ? "Live event story · pause or seek for automatic Foundry narration"
+    : visibleAiInsight?.source === "rule-based"
+      ? `Foundry unavailable (${visibleAiInsight.status}) · event-based fallback`
+    : aiError || (match.metadata.id !== demoMatch.id
+      ? "This fixture uses event-based recaps and in-browser ONNX insights"
+      : "Event-based story · Foundry narration appears automatically after seeking or pausing");
   const possessionWins = match.events.filter((event) => event.type === "possession_change" && event.elapsedSeconds <= replay.elapsedSeconds);
   const recapTiles = [
     { label: "Goals", home: home.goals, away: away.goals },
@@ -397,10 +326,12 @@ useEffect(() => {
       if (target?.closest("input, select, textarea, button, a, summary, [contenteditable], [role='button'], [role='listbox'], [role='dialog']")) return;
       if (event.code === "Space") {
         event.preventDefault();
+        setHasReplayInteracted(true);
         setReplay((current) => current.status === "playing" ? pauseReplay(current) : current.status === "finished" ? current : playReplay(current, match));
       } else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
         event.preventDefault();
         const step = event.key === "ArrowRight" ? 15 : -15;
+        setHasReplayInteracted(true);
         setReplay((current) => seekReplay(current, match, Math.max(0, Math.min(match.metadata.durationSeconds, current.elapsedSeconds + step))));
       }
     };
@@ -444,34 +375,6 @@ useEffect(() => {
           ]} />
         </motion.div>
 
-        {match.metadata.id === demoMatch.id && (
-          <section className="card" aria-label="Microsoft Foundry narrative preview">
-            <div className="card-head">
-              <div><span className="eyebrow">AI insight · Original fixture</span><h2>Microsoft Foundry narration</h2></div>
-              <span className="count">Public preview · No sign-in</span>
-            </div>
-            <p>Pause the match at any moment, then generate an evidence-linked Foundry narrative. No API key or login is required. The demo has a limited shared quota; replay, ONNX and recaps always remain available.</p>
-            <button type="button" className="btn btn-primary btn-sm" disabled={publicAiBusy || replay.status === "playing" || !frame.latestEvent}
-              onClick={() => { void generatePublicNarrative(); }}>
-              {publicAiBusy ? "Generating AI insight…" : "Generate AI narrative"}
-            </button>
-            {publicAiNotice && <p role="status">{publicAiNotice}</p>}
-            <details>
-              <summary>Project operator access (optional)</summary>
-              {operatorReady ? (
-                <p>Operator session active. Paused moments also request the authenticated specialist workflow.</p>
-              ) : (
-                <form onSubmit={(event) => { event.preventDefault(); void enableOperatorAI(); }}>
-                  <p>For project owners: sign in for the separately authenticated operator workflow.</p>
-                  <label htmlFor="operator-demo-code">Operator access code</label>
-                  <input id="operator-demo-code" type="password" autoComplete="off" value={operatorCode} onChange={(e) => setOperatorCode(e.target.value)} required minLength={32} maxLength={256} />
-                  <button className="btn btn-secondary btn-sm" type="submit" disabled={operatorBusy || operatorCode.length < 32}>{operatorBusy ? "Connecting…" : "Enable operator mode"}</button>
-                  {operatorError && <p role="alert">{operatorError}</p>}
-                </form>
-              )}
-            </details>
-          </section>
-        )}
         <motion.section className="card phase8-fixtures" variants={enter} aria-label="Choose a fictional match">
           <div className="card-head">
             <div><span className="eyebrow">Explore the league</span><h2>Choose your match</h2></div>
@@ -555,7 +458,7 @@ useEffect(() => {
             <div className="controls-main">
               <motion.button className="btn btn-primary play-btn" type="button" disabled={replay.status === "finished"} aria-label={isPlaying ? "Pause match replay" : "Play match replay"}
                 whileTap={{ scale: 0.96 }}
-                onClick={() => setReplay((current) => isPlaying ? pauseReplay(current) : playReplay(current, match))}>
+                onClick={() => { setHasReplayInteracted(true); setReplay((current) => isPlaying ? pauseReplay(current) : playReplay(current, match)); }}>
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span key={isPlaying ? "pause" : "play"} className="play-icon" initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.6 }} transition={{ duration: 0.15 }}>
                     {isPlaying ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
@@ -565,7 +468,7 @@ useEffect(() => {
               </motion.button>
               <motion.button className="icon-btn icon-btn-outline" type="button" aria-label="Restart match replay" title="Restart match replay"
                 whileTap={{ rotate: -120, scale: 0.94 }} transition={SPRING_UI}
-                onClick={() => { setReplay((current) => restartReplay(current)); setDismissedEventId(null); }}>
+                onClick={() => { setHasReplayInteracted(true); setReplay((current) => restartReplay(current)); setDismissedEventId(null); }}>
                 <RotateCcw aria-hidden="true" />
               </motion.button>
               <Segmented id="studio-speed" label="Replay speed" size="sm" value={replay.speed} onChange={(speed) => setReplay((current) => setReplaySpeed(current, speed))}
@@ -664,14 +567,17 @@ useEffect(() => {
                   <div className="story-panel-head">
                     <span className="story-icon" aria-hidden="true"><BookOpen /></span>
                     <span className="story-title">{isAnalyst ? "Generated explanation" : "Match story"}</span>
-                    {(isAnalyst || visibleAiInsight?.source === "foundry") && <span className={`source-tag is-${visibleAiInsight?.source ?? "pending"}`}>{sourceLabel}</span>}
+                    <span className={`source-tag is-${visibleAiInsight?.source ?? "rule-based"}`}>{sourceLabel}</span>
                   </div>
                   <AnimatePresence mode="wait" initial={false}>
                     <motion.div key={isAnalyst ? "analyst" : "fan"} className="story-panel-copy" {...swap}>
                       <p>{storyText}</p>
                     </motion.div>
                   </AnimatePresence>
-                  <small className="story-note">{storyNote}</small>
+                  <small className="story-note" aria-live="polite">{storyNote}</small>
+                  {visibleAiInsight?.source === "foundry" && (
+                    <small className="story-note">Verified event IDs: {visibleAiInsight.evidence_ids.join(" · ")}</small>
+                  )}
                 </article>
                 <article className="story-panel is-recap" aria-label="Quick recap">
                   <div className="story-panel-head">
