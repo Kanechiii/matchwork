@@ -92,6 +92,12 @@ python -m backend.evaluate_agents
 
 Additional reproducibility, replay, ONNX, enterprise and workflow checks run in [GitHub Actions](.github/workflows/quality.yml).
 
+## Nine-fixture Foundry narratives
+
+The Match story supports automatic, evidence-linked Microsoft Foundry narration for **all nine fictional league fixtures**. Pause or seek in any fixture; the browser submits its fixture ID, sampled match clock, and Fan/Analyst audience. The server selects the last five observed events from that fixture's own checksum-verified seeded replay; arbitrary client event descriptions and future events are never accepted. The Tactical Analyst and Narrative Agent use this bounded evidence, followed by a citation auditor.
+
+Narratives are **opt-in at the server**, controlled by `MATCHWORK_PUBLIC_AI_ENABLED`, Redis-backed public and global quotas, and server-side model credentials. Successful generated narratives are cached per fixture + audience + observed clock and can be reused safely from earlier match moments. When the budget is exhausted or Foundry is unavailable, every fixture retains the deterministic story and browser-side ONNX classification. Automatic narration is requested after pauses/seeks, not on every live playback tick. All fixtures and evidence are synthetic.
+
 ## Security, Cost and Limitations
 
 - The canonical synthetic ledger and event IDs support auditing but do not establish factual correctness of generated narratives.
