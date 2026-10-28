@@ -129,7 +129,7 @@ class PublicPreviewTests(unittest.TestCase):
                 first_id = payload["events"][0]["id"]
                 selected = resolve_evidence(match_id, 60, [first_id])
                 self.assertEqual(selected["evidence_ids"], [first_id])
-                self.assertIn(payload["home_team"]["name"], selected["description"])
+                self.assertIn(next(team["name"] for team in (payload["home_team"], payload["away_team"]) if team["id"] == payload["events"][0]["teamId"]), selected["description"])
 
     def test_fixture_cache_is_isolated(self):
         async def model(evidence, audience, fallback):
