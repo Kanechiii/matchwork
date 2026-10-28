@@ -1,7 +1,7 @@
 
-import { useEffect, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { ChartColumn, ChevronDown, CircleAlert, Info, Pause, Play, RefreshCw, RotateCcw, Users, X } from "lucide-react";
+import { Activity, BookOpen, ChartColumn, ChartColumnBig, ChartSpline, ChevronDown, CircleAlert, Info, ListChecks, Pause, Play, RefreshCw, RotateCcw, SlidersHorizontal, Users, X } from "lucide-react";
 import type { MatchEvent } from "./types/match";
 import { demoMatch } from "./data/demoMatch";
 import { generateSyntheticMatch } from "./engine/generateEvents";
@@ -24,55 +24,29 @@ import "./App.css";
 import LandingPage from "./LandingPage";
 import { leagueFixtures, leagueTeams } from "./data/league";
 import { calculatePlayerStats, aggregatePlayerStats } from "./engine/calculatePlayerStats";
+import { calculateMatchStats } from "./engine/calculateStats";
 import { Brand } from "./components/Brand";
 import { ThemeToggle } from "./components/ThemeToggle";
-import { Pitch } from "./components/Pitch";
 import { EventIcon } from "./components/EventIcon";
 import { Segmented } from "./components/Segmented";
+import { TeamCrest } from "./components/TeamCrest";
 import { EASE_IN, EASE_OUT, SPRING_BAR, SPRING_UI, swap } from "./motion";
 import {
   requestMatchInsight,
   type MatchEvidence,
   type MatchInsight,
 } from "./services/matchworkAI";
+import { buildRoster, describeEvent, formatClock } from "./studio/format";
+import { FixturePicker, FixtureStrip } from "./studio/Fixtures";
+import { TeamFollow } from "./studio/TeamFollow";
+import { ActionPitch } from "./studio/ActionPitch";
+import { CompareColumns, MomentumChart, TrendChart, type MomentumBucket, type TrendPoint } from "./studio/StatCharts";
+import { PlayerBoard } from "./studio/PlayerBoard";
+import { buildStatTimeline, PERIOD_SECONDS, STAT_METRICS, TIMELINE_STEP, ZERO_TEAM_STATS } from "./studio/statSeries";
+import "./studio/studio.css";
 
 // Generated once, outside React rendering.
 const match = generateSyntheticMatch(demoMatch);
-
-function formatClock(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-
-  return `${String(minutes).padStart(2, "0")}:${String(
-    remaining,
-  ).padStart(2, "0")}`;
-}
-
-function describeEvent(event: MatchEvent): string {
-  switch (event.type) {
-    case "pass":
-      return event.completed
-        ? "Completed pass"
-        : "Incomplete pass";
-
-    case "shot":
-      return `Shot — ${event.outcome.replaceAll("_", " ")}`;
-
-    case "tackle":
-      return event.wonBall
-        ? "Successful tackle"
-        : "Unsuccessful tackle";
-
-    case "pressure":
-      return `Defensive pressure — level ${event.intensity}`;
-
-    case "possession_change":
-      return `Possession change — ${event.reason.replaceAll(
-        "_",
-        " ",
-      )}`;
-  }
-}
 
 function MatchStudio({ match, selectedFixture, onSelectFixture }: { match: typeof leagueFixtures[number]["match"]; selectedFixture: string; onSelectFixture: (id: string) => void }) {
   const [replay, setReplay] = useState(() =>
@@ -84,9 +58,15 @@ function MatchStudio({ match, selectedFixture, onSelectFixture }: { match: typeo
   const [prediction, setPrediction] = useState<MatchPrediction | null>(null);
   const [dismissedEventId, setDismissedEventId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(true);
-  const [insightTab, setInsightTab] = useState<"story" | "recap">("story");
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [playerView, setPlayerView] = useState<"replay" | "season">("replay");
+  // Presentation-only state for the enhanced dashboard.
+  const [playerTeam, setPlayerTeam] = useState<TeamId | "all">("all");
+  const [statView, setStatView] = useState<"compare" | "columns" | "trend" | "momentum">("compare");
+  const [statMetric, setStatMetric] = useState("shots");
+  const [pitchMode, setPitchMode] = useState<"recent" | "window">("recent");
+  const roster = useMemo(() => buildRoster(match), [match]);
+  const statTimeline = useMemo(() => buildStatTimeline(match), [match]);
   
 const [aiResponse, setAiResponse] = useState<{
   key: string;
@@ -273,10 +253,9 @@ useEffect(() => {
 
   const playerStats = calculatePlayerStats(match, replay.elapsedSeconds);
   const leagueStats = aggregatePlayerStats(leagueFixtures.map(f => f.match));
-  const displayedPlayers = (playerView === "replay" ? playerStats : leagueStats)
-    .filter(p => favoriteTeam === "all" || p.teamId === favoriteTeam)
-    .sort((a, b) => b.goals - a.goals || b.shots - a.shots || a.name.localeCompare(b.name));
-  const focusedPlayer = selectedPlayer ? displayedPlayers.find(p => p.playerId === selectedPlayer) : null;
+  const sourcePlayers = playerView === "replay" ? playerStats : leagueStats;
+  // Following a team also filters the player board; the board's own team filter can override it.
+  const followTeam = (team: TeamId | "all") => { setFavoriteTeam(team); setPlayerTeam(team); };
 
   // ---- Presentation layer. Everything above this line is the unchanged replay and insight logic. ----
   const durationSeconds = match.metadata.durationSeconds;
@@ -312,6 +291,57 @@ useEffect(() => {
   ];
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
+  // Story and recap panels. The fan story avoids repeating the recap when the
+  // explanation is the deterministic fallback (which is the recap text itself).
+  const momentActor = latestMoment ? roster.get(latestMoment.playerId) : undefined;
+  const momentStory = latestMoment
+    ? `${describeEvent(latestMoment)} at ${formatClock(latestMoment.elapsedSeconds)}${momentActor ? `, involving ${momentActor.player.name} (#${momentActor.player.shirtNumber}) of ${momentActor.team.name}` : ""}.`
+    : "Start the replay to discover the biggest moments.";
+  const aiStory = visibleAiInsight && visibleAiInsight.explanation !== recap ? visibleAiInsight.explanation : null;
+  const storyText = isAnalyst
+    ? visibleAiInsight?.explanation ?? (replay.status === "playing" ? "Pause replay to request Foundry explanation." : recap)
+    : aiStory ?? momentStory;
+  const storyNote = isAnalyst
+    ? visibleAiInsight?.source === "foundry" ? "Microsoft Foundry response · backed by submitted observed event IDs" : visibleAiInsight?.source === "rule-based" ? "Foundry unavailable · deterministic fallback" : "Only events up to the replay clock are used"
+    : replay.status === "playing" ? "Pause on a moment for a deeper match story" : visibleAiInsight?.source === "foundry" ? "Expanded story ready" : "Showing the match story from observed events";
+  const possessionWins = match.events.filter((event) => event.type === "possession_change" && event.elapsedSeconds <= replay.elapsedSeconds);
+  const recapTiles = [
+    { label: "Goals", home: home.goals, away: away.goals },
+    { label: "Shots", home: home.shots, away: away.shots },
+    { label: "Pressures", home: home.pressuresApplied, away: away.pressuresApplied },
+    { label: "Possession changes", home: possessionWins.filter((e) => e.teamId === homeTeam.id).length, away: possessionWins.filter((e) => e.teamId === awayTeam.id).length },
+  ];
+
+  // Pitch: the latest five events, or every event in the model's 180s feature window.
+  const pitchWindowStart = Math.max(0, replay.elapsedSeconds - 180);
+  const pitchEvents = pitchMode === "recent"
+    ? frame.recentEvents.slice(-5)
+    : match.events.filter((event) => event.elapsedSeconds >= pitchWindowStart && event.elapsedSeconds <= replay.elapsedSeconds);
+
+  // Statistic charts read the same engine snapshots as the live panel.
+  const statsAt = (t: number) => t === replay.elapsedSeconds ? frame.stats : statTimeline.get(t) ?? calculateMatchStats(match, t);
+  const metricOptions = STAT_METRICS.filter((metric) => isAnalyst || !metric.analystOnly);
+  const activeMetric = metricOptions.find((metric) => metric.key === statMetric) ?? metricOptions[0];
+  const trendPoints: TrendPoint[] = [];
+  for (let t = activeMetric.unit === "%" ? TIMELINE_STEP : 0; t < replay.elapsedSeconds; t += TIMELINE_STEP) {
+    const snapshot = statsAt(t);
+    trendPoints.push({ t, home: activeMetric.total(snapshot.home), away: activeMetric.total(snapshot.away) });
+  }
+  if (replay.elapsedSeconds > 0 || activeMetric.unit !== "%") {
+    trendPoints.push({ t: replay.elapsedSeconds, home: activeMetric.total(home), away: activeMetric.total(away) });
+  }
+  const momentumBuckets: MomentumBucket[] = Array.from({ length: Math.ceil(durationSeconds / PERIOD_SECONDS) }, (_, i) => {
+    const start = i * PERIOD_SECONDS;
+    const end = Math.min(durationSeconds, start + PERIOD_SECONDS);
+    const label = `${start / 60}–${Math.round(end / 60)}'`;
+    if (replay.elapsedSeconds <= start) return { label, home: null, away: null, live: false };
+    const until = Math.min(end, replay.elapsedSeconds);
+    const from = start === 0 ? { home: ZERO_TEAM_STATS, away: ZERO_TEAM_STATS } : statsAt(start), to = statsAt(until);
+    return { label, home: activeMetric.period(to.home, from.home, until - start), away: activeMetric.period(to.away, from.away, until - start), live: replay.elapsedSeconds < end };
+  });
+  const goalMarks = shotMarks.filter((shot) => shot.outcome === "goal").map((shot) => ({ id: shot.id, t: shot.elapsedSeconds, side: shot.teamId === homeTeam.id ? "home" as const : "away" as const }));
+  const boardTeams = playerView === "replay" ? [homeTeam, awayTeam] : [homeTeam, awayTeam, ...leagueTeams.filter((team) => team.id !== homeTeam.id && team.id !== awayTeam.id)];
+
   // Timeline hover preview.
   const [hover, setHover] = useState<{ ratio: number; time: number } | null>(null);
   const onTimelineHover = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -343,7 +373,7 @@ useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, select, textarea, button, a, summary, [contenteditable]")) return;
+      if (target?.closest("input, select, textarea, button, a, summary, [contenteditable], [role='button'], [role='listbox'], [role='dialog']")) return;
       if (event.code === "Space") {
         event.preventDefault();
         setReplay((current) => current.status === "playing" ? pauseReplay(current) : current.status === "finished" ? current : playReplay(current, match));
@@ -394,16 +424,15 @@ useEffect(() => {
         </motion.div>
 
         <motion.section className="card phase8-fixtures" variants={enter} aria-label="Choose a fictional match">
-          <div className="card-head"><div><span className="eyebrow">Explore the league</span><h2>Choose your match</h2></div><span className="count">{leagueTeams.length} clubs · {leagueFixtures.length} fixtures</span></div>
-          <div className="phase8-match-select">
-            <label htmlFor="phase8-fixture">Selected fixture</label>
-            <select id="phase8-fixture" value={selectedFixture} onChange={event => onSelectFixture(event.target.value)}>
-              {leagueFixtures.map(f => <option key={f.id} value={f.id}>{f.round} · {f.match.metadata.title}</option>)}
-            </select>
+          <div className="card-head">
+            <div><span className="eyebrow">Explore the league</span><h2>Choose your match</h2></div>
+            <div className="league-clubs">
+              <span className="league-crests" aria-hidden="true">{leagueTeams.map((team) => <TeamCrest key={team.id} team={team} size="xs" />)}</span>
+              <span className="count">{leagueTeams.length} clubs · {leagueFixtures.length} fixtures</span>
+            </div>
           </div>
-          <div className="phase8-fixture-strip" aria-label="Match fixtures">
-            {leagueFixtures.map(f => <button type="button" key={f.id} className={selectedFixture === f.id ? "is-selected" : ""} aria-pressed={selectedFixture === f.id} onClick={() => onSelectFixture(f.id)}><small>{f.round}</small><strong>{f.match.metadata.homeTeam.abbreviation} – {f.match.metadata.awayTeam.abbreviation}</strong></button>)}
-          </div>
+          <FixturePicker fixtures={leagueFixtures} value={selectedFixture} onChange={onSelectFixture} featuredId={demoMatch.id} />
+          <FixtureStrip fixtures={leagueFixtures} teams={leagueTeams} value={selectedFixture} onChange={onSelectFixture} />
           {match.metadata.id !== demoMatch.id && <p className="phase8-notice">This synthetic fixture supports replay, in-browser model insights and player stats. Secure Foundry narration is limited to the canonical original match until the server ledger is expanded.</p>}
         </motion.section>
 
@@ -415,7 +444,7 @@ useEffect(() => {
 
           <div className="scoreline">
             <div className="team team-home">
-              <span className="crest is-home" aria-hidden="true">{homeTeam.abbreviation}</span>
+              <TeamCrest team={homeTeam} size="lg" className="scoreline-crest" />
               <div><h2>{homeTeam.name}</h2><small>Home</small></div>
             </div>
             <div className="score-center">
@@ -428,7 +457,7 @@ useEffect(() => {
             </div>
             <div className="team team-away">
               <div><h2>{awayTeam.name}</h2><small>Away</small></div>
-              <span className="crest is-away" aria-hidden="true">{awayTeam.abbreviation}</span>
+              <TeamCrest team={awayTeam} size="lg" className="scoreline-crest" />
             </div>
             <div className="goal-flash-slot" aria-live="polite">
               <AnimatePresence>
@@ -508,18 +537,9 @@ useEffect(() => {
                   <span className="eyebrow">{isAnalyst ? "Analysis" : "Your match story"} · <span className="tabular">{formatClock(replay.elapsedSeconds)}</span></span>
                   <h2>{isAnalyst ? "Match intelligence" : "What's happening?"}</h2>
                 </div>
-                <label className="field" htmlFor="focus-team">
-                  <span>{isAnalyst ? "Analysis target" : "Follow a team"}</span>
-                  <span className="select-wrap">
-                    <select id="focus-team" value={favoriteTeam} onChange={(event) => setFavoriteTeam(event.target.value as TeamId | "all")}>
-                      <option value="all">Both teams</option>
-                      <option value={homeTeam.id}>{homeTeam.name}</option>
-                      <option value={awayTeam.id}>{awayTeam.name}</option>
-                    </select>
-                    <ChevronDown aria-hidden="true" />
-                  </span>
-                </label>
               </div>
+
+              <TeamFollow label={isAnalyst ? "Analysis target" : "Follow a team"} value={favoriteTeam} home={homeTeam} away={awayTeam} onChange={followTeam} />
 
               <Collapse show={isAnalyst}>
                 <div className="model-strip">
@@ -580,32 +600,50 @@ useEffect(() => {
                   </div>
                 )}
               </Collapse>
+            </section>
 
-              <Collapse show={!isAnalyst}>
-                <Segmented id="studio-story" label="Story format" size="sm" className="insight-tabs" value={insightTab} onChange={setInsightTab} options={[
-                  { value: "story", label: "Match story" },
-                  { value: "recap", label: "Quick recap" },
-                ]} />
-              </Collapse>
-
-              <AnimatePresence mode="wait" initial={false}>
-                {isAnalyst || insightTab === "recap" ? (
-                  <motion.div key={isAnalyst ? "analyst" : "recap"} className="narrative" {...swap}>
-                    <div className="narrative-head">
-                      <span className="label">{isAnalyst ? "Generated explanation" : "The story so far"}</span>
-                      {isAnalyst && <span className={`source-tag is-${visibleAiInsight?.source ?? "pending"}`}>{sourceLabel}</span>}
-                    </div>
-                    <p>{isAnalyst ? visibleAiInsight?.explanation ?? (replay.status === "playing" ? "Pause replay to request Foundry explanation." : recap) : recap}</p>
-                    {isAnalyst && <small>{visibleAiInsight?.source === "foundry" ? "Microsoft Foundry response · backed by submitted observed event IDs" : visibleAiInsight?.source === "rule-based" ? "Foundry unavailable · deterministic fallback" : "Only events up to the replay clock are used"}</small>}
-                  </motion.div>
-                ) : (
-                  <motion.div key="story" className="narrative" {...swap}>
-                    <div className="narrative-head"><span className="label">The moment</span></div>
-                    <p>{visibleAiInsight?.explanation ?? (latestMoment ? describeEvent(latestMoment) : "Start the replay to discover the biggest moments.")}</p>
-                    <small>{replay.status === "playing" ? "Pause on a moment for a deeper match story" : visibleAiInsight?.source === "foundry" ? "Expanded story ready" : "Showing the match story from observed events"}</small>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            <section className="card story-desk" aria-label="Match story and quick recap">
+              <div className="card-head">
+                <div>
+                  <span className="eyebrow">{isAnalyst ? "Narrative" : "Story time"} · <span className="tabular">{formatClock(replay.elapsedSeconds)}</span></span>
+                  <h2>{isAnalyst ? "Explanation and recap" : "Match story and quick recap"}</h2>
+                </div>
+                <span className={`status-chip is-${replay.status}`}><span className="status-dot" aria-hidden="true" />{isPlaying ? "Live" : statusLabel}</span>
+              </div>
+              <div className="story-panels">
+                <article className="story-panel is-story" aria-label={isAnalyst ? "Generated explanation" : "Match story"}>
+                  <div className="story-panel-head">
+                    <span className="story-icon" aria-hidden="true"><BookOpen /></span>
+                    <span className="story-title">{isAnalyst ? "Generated explanation" : "Match story"}</span>
+                    {(isAnalyst || visibleAiInsight?.source === "foundry") && <span className={`source-tag is-${visibleAiInsight?.source ?? "pending"}`}>{sourceLabel}</span>}
+                  </div>
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div key={isAnalyst ? "analyst" : "fan"} className="story-panel-copy" {...swap}>
+                      <p>{storyText}</p>
+                    </motion.div>
+                  </AnimatePresence>
+                  <small className="story-note">{storyNote}</small>
+                </article>
+                <article className="story-panel is-recap" aria-label="Quick recap">
+                  <div className="story-panel-head">
+                    <span className="story-icon" aria-hidden="true"><ListChecks /></span>
+                    <span className="story-title">Quick recap</span>
+                    <span className="story-through tabular">Through {formatClock(replay.elapsedSeconds)}</span>
+                  </div>
+                  <dl className="recap-tiles">
+                    {recapTiles.map((tile) => (
+                      <div key={tile.label}>
+                        <dt>{tile.label}</dt>
+                        <dd className="tabular"><strong>{tile.home + tile.away}</strong>
+                          <span><i className="legend-dot is-home" />{tile.home}<span className="recap-sep">–</span>{tile.away}<i className="legend-dot is-away" /></span>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p>{recap}</p>
+                  <small className="story-note">Rule-generated from observed synthetic events · {homeTeam.abbreviation} vs {awayTeam.abbreviation}</small>
+                </article>
+              </div>
             </section>
 
             <AnimatePresence initial={false}>
@@ -635,11 +673,19 @@ useEffect(() => {
                 <div><span className="eyebrow">From the pitch</span><h2>{isAnalyst ? "Observed event position" : "Where the action is"}</h2></div>
                 <div className="legend"><span><i className="legend-dot is-home" />{homeTeam.abbreviation}</span><span><i className="legend-dot is-away" />{awayTeam.abbreviation}</span></div>
               </div>
-              <div className="pitch-frame">
-                <Pitch events={frame.recentEvents.slice(-5)} homeId={homeTeam.id} ping
-                  label={latestMoment ? `Latest observed event location, ${Math.round(latestMoment.x)} percent along and ${Math.round(latestMoment.y)} percent across the pitch` : "Pitch visualization awaiting the first event"} />
+              <div className="pitch-toolbar">
+                <Segmented id="studio-pitch" label="Events shown on the pitch" size="sm" value={pitchMode} onChange={setPitchMode} options={[
+                  { value: "recent", label: "Latest 5" },
+                  { value: "window", label: "Last 3 min" },
+                ]} />
+                <span className="count tabular">{pitchEvents.length} {pitchEvents.length === 1 ? "event" : "events"}</span>
               </div>
-              <p className="card-foot tabular">{latestMoment ? `${formatClock(latestMoment.elapsedSeconds)} · ${describeEvent(latestMoment)}` : "Start the replay to see where recorded match events occur."}</p>
+              <div className="pitch-frame">
+                <ActionPitch events={pitchEvents} match={match} roster={roster} isAnalyst={isAnalyst} path={pitchMode === "recent"} fade={pitchMode === "window"}
+                  onOpenPlayer={(playerId) => setSelectedPlayer(playerId)}
+                  label={latestMoment ? `Latest observed event location, ${Math.round(latestMoment.x)} percent along and ${Math.round(latestMoment.y)} percent across the pitch. Hover or focus a dot for player and team details.` : "Pitch visualization awaiting the first event"} />
+              </div>
+              <p className="card-foot tabular">{latestMoment ? `${formatClock(latestMoment.elapsedSeconds)} · ${describeEvent(latestMoment)}${momentActor ? ` · ${momentActor.player.name}` : ""}` : "Start the replay to see where recorded match events occur."}</p>
             </section>
 
             <section className="card feed-card" aria-label="Recent match events">
@@ -676,7 +722,15 @@ useEffect(() => {
         <motion.section className="card stats" id="numbers" aria-label="Match statistics" variants={enter}>
           <div className="card-head">
             <div><span className="eyebrow">Match stats</span><h2>{isAnalyst ? "Live match statistics" : "Match at a glance"}</h2></div>
-            <span className="count tabular">As of {formatClock(replay.elapsedSeconds)}</span>
+            <div className="stats-head-end">
+              <Segmented id="studio-statview" label="Statistics visualization" size="sm" className="statview" value={statView} onChange={setStatView} options={[
+                { value: "compare", label: <span className="sv-text">Compare</span>, icon: <SlidersHorizontal aria-hidden="true" /> },
+                { value: "columns", label: <span className="sv-text">Bar chart</span>, icon: <ChartColumnBig aria-hidden="true" /> },
+                { value: "trend", label: <span className="sv-text">Trend</span>, icon: <ChartSpline aria-hidden="true" /> },
+                { value: "momentum", label: <span className="sv-text">By period</span>, icon: <Activity aria-hidden="true" /> },
+              ]} />
+              <span className="count tabular">As of {formatClock(replay.elapsedSeconds)}</span>
+            </div>
           </div>
           <div className="possession">
             <div className="possession-row tabular">
@@ -686,36 +740,68 @@ useEffect(() => {
             </div>
             <div className="split-bar is-lg"><span className="is-home" style={{ width: `${homeShare}%` }} /><span className="is-away" /></div>
           </div>
-          <div className="stat-grid">
-            <AnimatePresence initial={false}>
-              {statRows.map((stat) => {
-                const total = stat.left + stat.right;
-                const share = total === 0 ? 50 : (100 * stat.left) / total;
-                return (
-                  <motion.div className="stat" key={stat.label} layout="position"
-                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.15 } }} transition={{ duration: 0.35, ease: EASE_OUT }}>
-                    <div className="stat-row tabular">
-                      <strong className={stat.left > stat.right ? "is-lead" : ""}>{stat.left}{stat.unit}</strong>
-                      <span>{stat.label}</span>
-                      <strong className={stat.right > stat.left ? "is-lead" : ""}>{stat.right}{stat.unit}</strong>
-                    </div>
-                    <div className="split-bar"><span className="is-home" style={{ width: `${share}%` }} /><span className="is-away" /></div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
+          {(statView === "trend" || statView === "momentum") && (
+            <div className="metric-picker" role="group" aria-label="Statistic to chart">
+              {metricOptions.map((metric) => (
+                <button type="button" key={metric.key} className="club-chip" aria-pressed={metric.key === activeMetric.key} onClick={() => setStatMetric(metric.key)}>{metric.label}</button>
+              ))}
+            </div>
+          )}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={statView} className="stat-view" {...swap}>
+              {statView === "compare" && (
+                <div className="stat-grid">
+                  <AnimatePresence initial={false}>
+                    {statRows.map((stat) => {
+                      const total = stat.left + stat.right;
+                      const share = total === 0 ? 50 : (100 * stat.left) / total;
+                      return (
+                        <motion.div className="stat" key={stat.label} layout="position"
+                          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.15 } }} transition={{ duration: 0.35, ease: EASE_OUT }}>
+                          <div className="stat-row tabular">
+                            <strong className={stat.left > stat.right ? "is-lead" : ""}>{stat.left}{stat.unit}</strong>
+                            <span>{stat.label}</span>
+                            <strong className={stat.right > stat.left ? "is-lead" : ""}>{stat.right}{stat.unit}</strong>
+                          </div>
+                          <div className="split-bar"><span className="is-home" style={{ width: `${share}%` }} /><span className="is-away" /></div>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              )}
+              {statView === "columns" && (
+                <CompareColumns rows={[{ label: "Possession", left: Math.round(home.possessionPct), right: Math.round(away.possessionPct), unit: "%" }, ...statRows]}
+                  homeLabel={homeTeam.abbreviation} awayLabel={awayTeam.abbreviation} />
+              )}
+              {statView === "trend" && (
+                <TrendChart metric={activeMetric} points={trendPoints} duration={durationSeconds} elapsed={replay.elapsedSeconds} goals={goalMarks}
+                  homeLabel={homeTeam.abbreviation} awayLabel={awayTeam.abbreviation} />
+              )}
+              {statView === "momentum" && (
+                <MomentumChart metric={activeMetric} buckets={momentumBuckets} homeLabel={homeTeam.abbreviation} awayLabel={awayTeam.abbreviation} />
+              )}
+            </motion.div>
+          </AnimatePresence>
+          <p className="stat-foot">
+            {statView === "compare" && "Share of each statistic between the two teams."}
+            {statView === "columns" && "Each pair of bars is scaled to its own statistic; percentages share a 0–100 scale."}
+            {statView === "trend" && `${activeMetric.label} for both teams, sampled every minute up to the replay clock. Goal markers sit on the time axis.`}
+            {statView === "momentum" && `${activeMetric.label} inside each 15-minute period. The current period updates live.`}
+          </p>
         </motion.section>
 
         <motion.section className="card phase8-players" id="players" variants={enter} aria-label="Synthetic player performance">
-          <div className="card-head"><div><span className="eyebrow">Players · Event-derived</span><h2>Player performance</h2></div><div className="phase8-view-switch" role="group" aria-label="Statistics period"><button type="button" aria-pressed={playerView === "replay"} className={playerView === "replay" ? "is-selected" : ""} onClick={() => setPlayerView("replay")}>Replay so far</button><button type="button" aria-pressed={playerView === "season"} className={playerView === "season" ? "is-selected" : ""} onClick={() => setPlayerView("season")}>All fixtures</button></div></div>
-          <p className="phase8-description">Every number below comes from recorded synthetic events. Select a player for their match activity and evidence references.</p>
-          <div className="phase8-player-grid">{displayedPlayers.map(p => <button type="button" key={p.playerId} className={focusedPlayer?.playerId === p.playerId ? "phase8-player is-selected" : "phase8-player"} onClick={() => setSelectedPlayer(current => current === p.playerId ? null : p.playerId)} aria-pressed={focusedPlayer?.playerId === p.playerId}>
-            <span className="phase8-player-initial">{p.name.split(" ").map(w => w[0]).join("").slice(0,2)}</span><span className="phase8-player-name"><strong>{p.name}</strong><small>#{p.number} · {p.position} · {leagueTeams.find(t=>t.id===p.teamId)?.abbreviation}</small></span><span className="phase8-player-goals"><b>{p.goals}</b><small>goals</small></span>
-          </button>)}</div>
-          {focusedPlayer && <div className="phase8-player-detail" aria-live="polite"><h3>{focusedPlayer.name} <small>· #{focusedPlayer.number}</small></h3><div className="phase8-player-numbers">
-            {([{label:"Goals",value:focusedPlayer.goals},{label:"Shots",value:focusedPlayer.shots},{label:"On target",value:focusedPlayer.shotsOnTarget},{label:"Passes",value:focusedPlayer.passesCompleted + "/" + focusedPlayer.passesAttempted},{label:"Pass accuracy",value:focusedPlayer.passCompletionPct + "%"},{label:"Tackles won",value:focusedPlayer.tacklesWon},{label:"Pressures",value:focusedPlayer.pressures},{label:"Passes received",value:focusedPlayer.passesReceived}]).map(v=><div key={v.label}><strong>{v.value}</strong><span>{v.label}</span></div>)}
-          </div>{isAnalyst && <details><summary>Observed event evidence ({focusedPlayer.evidenceIds.length})</summary><p>{focusedPlayer.evidenceIds.slice(-18).join(" · ") || "No observed actions yet"}</p></details>}</div>}
+          <div className="card-head">
+            <div><span className="eyebrow">Players · Event-derived</span><h2>Player performance</h2></div>
+            <Segmented id="studio-players" label="Statistics period" size="sm" value={playerView} onChange={setPlayerView} options={[
+              { value: "replay", label: "Replay so far" },
+              { value: "season", label: "All fixtures" },
+            ]} />
+          </div>
+          <p className="phase8-description">Every number below comes from recorded synthetic events. Rest on a card for a quick look, or select it for the full profile and evidence.</p>
+          <PlayerBoard players={sourcePlayers} teams={boardTeams} view={playerView} teamFilter={playerTeam} onTeamFilterChange={setPlayerTeam}
+            selectedId={selectedPlayer} onSelect={setSelectedPlayer} isAnalyst={isAnalyst} match={match} elapsedSeconds={replay.elapsedSeconds} onSeek={onSeek} />
           <p className="phase8-notice">All players, fixtures and statistics are fictional. These figures are not real-world performance measurements.</p>
         </motion.section>
 

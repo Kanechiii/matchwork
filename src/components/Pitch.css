@@ -3,7 +3,7 @@
 .pitch-stripe { fill: var(--pitch-stripe); }
 .pitch-lines { stroke: var(--pitch-line); stroke-width: 0.45; }
 .pitch-spot { fill: var(--pitch-line); }
-.pitch-dot { stroke: var(--surface); stroke-width: 0.4; opacity: .45; transition: cx .3s ease, cy .3s ease; }
+.pitch-dot { stroke: var(--surface); stroke-width: 0.4; opacity: var(--dot-opacity, .45); transition: cx .3s ease, cy .3s ease, opacity .25s; }
 .pitch-dot.is-latest { opacity: 1; stroke-width: 0.7; }
 .pitch-dot.is-home { fill: var(--home); }
 .pitch-dot.is-away { fill: var(--away); }
@@ -16,3 +16,26 @@
 .pitch-ping { fill: none; stroke-width: 0.6; }
 .pitch-ping.is-home { stroke: var(--home); }
 .pitch-ping.is-away { stroke: var(--away); }
+
+/* Interactive layer: hover, focus and pinned dots. */
+.pitch-event { outline: none; }
+.pitch.is-interactive .pitch-event { cursor: pointer; }
+.pitch-hit { fill: transparent; }
+.pitch-event.is-active .pitch-dot, .pitch-event:focus-visible .pitch-dot { opacity: 1; stroke-width: 0.8; }
+.pitch-focus { fill: none; stroke-width: 0.55; stroke-dasharray: 1.2 0.9; animation: pitch-spin 6s linear infinite; transform-box: fill-box; transform-origin: center; }
+.pitch-focus.is-home { stroke: var(--home); }
+.pitch-focus.is-away { stroke: var(--away); }
+.pitch-event:focus-visible .pitch-hit { stroke: var(--accent); stroke-width: 0.5; }
+.pitch-path { fill: none; stroke: var(--text-3); stroke-width: 0.45; stroke-dasharray: 1.4 1.1; stroke-linecap: round; stroke-linejoin: round; opacity: .55; animation: pitch-flow 1.6s linear infinite; }
+.pitch-pass line { stroke-width: 0.7; stroke-linecap: round; }
+.pitch-pass.is-failed line { stroke-dasharray: 1.2 1; }
+.pitch-pass.is-home line { stroke: var(--home); }
+.pitch-pass.is-away line { stroke: var(--away); }
+.pitch-pass circle { fill: var(--surface); stroke-width: 0.5; }
+.pitch-pass.is-home circle { stroke: var(--home); }
+.pitch-pass.is-away circle { stroke: var(--away); }
+@keyframes pitch-flow { to { stroke-dashoffset: -5; } }
+@keyframes pitch-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .pitch-path, .pitch-focus { animation: none !important; }
+}

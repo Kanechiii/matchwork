@@ -1,0 +1,37 @@
+/* Synthetic player portraits. --kit is the fictional club colour. */
+.player-avatar { --av: 40px; display: block; width: var(--av); height: var(--av); flex-shrink: 0; border-radius: 50%; box-shadow: 0 0 0 1px color-mix(in srgb, var(--kit) 30%, var(--border)); }
+.player-avatar.is-sm { --av: 32px; }
+.player-avatar.is-md { --av: 44px; }
+.player-avatar.is-lg { --av: 64px; }
+.player-avatar.is-xl { --av: 88px; }
+
+.av-bg { fill: color-mix(in srgb, var(--kit) 16%, var(--surface)); }
+.av-halo { fill: color-mix(in srgb, var(--kit) 12%, transparent); }
+.av-shirt { fill: var(--kit); }
+.av-shirt.is-gk { fill: color-mix(in srgb, var(--kit) 22%, gold); }
+.av-collar { fill: none; stroke: color-mix(in srgb, var(--kit) 50%, white); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.av-number { font: 800 8px/1 var(--font); fill: white; text-anchor: middle; opacity: .92; }
+.av-neck { fill: color-mix(in srgb, var(--skin) 82%, black); }
+.av-skin { fill: var(--skin); }
+.av-hair { fill: var(--hair); }
+.av-hair.is-buzz { opacity: .78; }
+.av-beard { fill: var(--hair); opacity: .88; }
+.av-band { fill: var(--kit); }
+.av-brow { fill: none; stroke: var(--hair); stroke-width: 1.3; stroke-linecap: round; }
+.av-eyes ellipse { fill: rgb(28 22 18); }
+.av-nose { fill: none; stroke: color-mix(in srgb, var(--skin) 68%, black); stroke-width: 1.1; stroke-linecap: round; }
+.av-mouth { fill: none; stroke: color-mix(in srgb, var(--skin) 42%, black); stroke-width: 1.3; stroke-linecap: round; }
+.av-cheek { fill: color-mix(in srgb, var(--skin) 60%, indianred); opacity: .35; }
+
+/* Idle life: blink, a slow head bob, and a breath in the shoulders. */
+.av-eyes { transform-box: fill-box; transform-origin: center; animation: av-blink 5.2s infinite; animation-delay: var(--av-delay, 0s); }
+.av-head { transform-box: view-box; transform-origin: 32px 40px; animation: av-bob 3.6s ease-in-out infinite alternate; animation-delay: calc(var(--av-delay, 0s) * -1); transition: transform .3s; }
+.av-figure { transform-box: view-box; transform-origin: 32px 64px; animation: av-breathe 4.4s ease-in-out infinite alternate; }
+
+@keyframes av-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes av-bob { from { transform: translateY(0) rotate(0deg); } to { transform: translateY(-.8px) rotate(-1.6deg); } }
+@keyframes av-breathe { from { transform: scale(1); } to { transform: scale(1.015); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .player-avatar * { animation: none !important; }
+}
