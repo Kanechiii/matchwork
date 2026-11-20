@@ -6,6 +6,8 @@ Keep Matchwork approachable for contributors and judges without obscuring techni
 
 ## Naming and Structure
 
+New PR titles are single sentence-style descriptions without Conventional Commit prefixes. Commits and squash subjects retain Conventional Commits. Follow [contribution standards](../CONTRIBUTING.md) and [agent instructions](../AGENTS.md).
+
 Use one descriptive H1 per file. Prefer title case: `# Matchwork — Topic` for current project guides and `# Phase N — Topic` for historical milestone records. Use uppercase snake case for existing phase documents only where renaming would break links; use descriptive file names for new guides.
 
 Preferred section order:
@@ -15,7 +17,7 @@ Preferred section order:
 3. **Design / Procedure** — concise architectural explanation and executable steps.
 4. **Verification** — exact tests, evidence and observable outcomes.
 5. **Risks / Limitations** — billing, security and deployment boundaries.
-6. **Acceptance Checklist** — `- [x]` only for actually verified items; `- [ ]` otherwise.
+6. **Acceptance evidence** — keep new acceptance cases in executable tests, CI and review discussions; preserve existing historical checklists.
 7. **Related Documents** — relative links to canonical sources.
 
 Do not assert that CI tests prove production behavior. A running replay or rule-based recap does not prove a live Foundry request. A successful Redis reservation does not prove a monetary spending cap.
@@ -25,7 +27,7 @@ Do not assert that CI tests prove production behavior. A running replay or rule-
 - Use relative links for repository-local files; use stable absolute URLs for deployed apps.
 - Keep commands copyable, label shells (`powershell`, `bash`, `python`) and separate commands that run inside Container Apps from local PowerShell commands.
 - Put secrets in Container Apps secrets / Key Vault. Never write secret values, direct access keys or bearer tokens in documentation.
-- Prefer concise tables for settings and status; checklists for explicitly testable acceptance gates.
+- Prefer concise tables for settings; keep new phase status and acceptance gates in chat and CI.
 - Preserve evidence provenance: user-reported browser check, Azure CLI output, unit test, CI workflow or direct authenticated integration test.
 - Document opt-in flags and fail-closed behavior; do not turn an experimental feature into a claimed default.
 - Avoid moving older phase files unless all inbound links, workflows and collaborator references are checked.
