@@ -73,6 +73,9 @@ jobs:
       - name: Verify match replay
         run: node scripts/verifyReplay.mjs
 
+      - name: Verify deterministic 3D replay projection
+        run: node scripts/verifyPitch3d.mjs
+
       - name: Verify integration
         run: node scripts/verifyIntegration.mjs
 

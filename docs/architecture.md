@@ -34,3 +34,11 @@ GitHub Pages is a static landing site; Studio routes to Azure Container Apps. Th
 ## Change control
 
 Review compatibility, data integrity, rollback and verification before changing contracts, model provenance, auth, quotas or deployment paths. Record approved architecture decisions here; keep project status and acceptance evidence in chat, executable tests and CI.
+
+## 3D replay presentation boundary
+
+The studio defaults to a lazy-loaded Three.js pitch with procedural full-body footballers, jersey numbers, broadcast and overhead cameras, and a keyboard-accessible player selector. The 2D observed-event view remains selectable and is the automatic fallback on renderer failure or WebGL context loss.
+
+`src/studio/pitch3d/playerMovement.ts` derives a repeatable visual frame from the existing replay clock and events observed at or before that time. Inter-event player positions, formations, action poses and ball trajectories are **illustrative synthetic reconstruction**, not measured tracking or independent football simulation. Only recorded event coordinates and IDs are evidence. The renderer consumes the projection without mutating replay or statistics or calling AI services. No new backend contracts or paid services are introduced.
+
+The projection regression script (`node scripts/verifyPitch3d.mjs`) covers deterministic positions, bounds, ball transitions, future-event isolation and seeking. Browser verification must separately cover WebGL rendering, controls, responsive layout, accessibility, context loss and performance.
