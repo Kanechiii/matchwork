@@ -2,9 +2,6 @@ import * as THREE from "three";
 
 const X = x => (x - 50) * 1.05;
 const Z = y => (y - 50) * 0.68;
-const box = new THREE.BoxGeometry(1, 1, 1);
-const sphere = new THREE.SphereGeometry(1, 10, 8);
-const cylinder = new THREE.CylinderGeometry(1, 1, 1, 8);
 const material = color => new THREE.MeshStandardMaterial({ color, roughness: 0.83 });
 
 export function createRenderer(host, roster, onHover, onSelect, onFailure) {
@@ -16,6 +13,9 @@ export function createRenderer(host, roster, onHover, onSelect, onFailure) {
   host.appendChild(canvas);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 300);
+  const box = new THREE.BoxGeometry(1, 1, 1);
+  const sphere = new THREE.SphereGeometry(1, 10, 8);
+  const cylinder = new THREE.CylinderGeometry(1, 1, 1, 8);
   const ownedMaterials = new Set();
   const ownedGeometries = new Set([box, sphere, cylinder]);
   const textures = [];
@@ -150,6 +150,6 @@ export function createRenderer(host, roster, onHover, onSelect, onFailure) {
     render,
     setView(next,nextZoom){view=next;zoom=nextZoom;aim();if(lastFrame)render(lastFrame,lastActive);else draw();},
     project(id){const m=models.get(id);if(!m)return null;const v=new THREE.Vector3(0,4.4,0);m.root.localToWorld(v);v.project(camera);return {x:(v.x+1)*50,y:(1-v.y)*50};},
-    dispose(){if(destroyed)return;destroyed=true;observer.disconnect();canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerleave",leave);canvas.removeEventListener("click",click);canvas.removeEventListener("webglcontextlost",lost);for(const m of ownedMaterials)m.dispose();for(const t of textures)t.dispose();renderer.dispose();canvas.remove();}
+    dispose(){if(destroyed)return;destroyed=true;observer.disconnect();canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerleave",leave);canvas.removeEventListener("click",click);canvas.removeEventListener("webglcontextlost",lost);for(const g of ownedGeometries)g.dispose();for(const m of ownedMaterials)m.dispose();for(const t of textures)t.dispose();renderer.dispose();canvas.remove();}
   };
 }
