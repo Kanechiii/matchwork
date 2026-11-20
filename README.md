@@ -1,66 +1,89 @@
+<div align="center">
+
 # Matchwork — The Game, Understood
 
-**Explainable, evidence-linked football intelligence for fans and analysts.** Built for the Microsoft × Premier League *Inside the Game: Developer Hackathon 2026*.
+**Explainable, evidence-linked football intelligence for fans and analysts.**
 
-[Live Azure Studio](https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/#/studio) · [GitHub Pages landing](https://kanechiii.github.io/matchwork/) · [Repository](https://github.com/Kanechiii/matchwork) · [Documentation](docs/README.md) · [Release checklist](docs/RELEASE_CHECKLIST.md)
+Built for the Microsoft × Premier League Inside the Game: Developer Hackathon 2026.
 
-> **Synthetic demonstration:** All teams, players and football events are fictional. Matchwork does not ingest live Premier League data or footage. ONNX model scores are illustrative and are not calibrated predictions for real matches.
+[![Quality checks](https://github.com/Kanechiii/matchwork/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/Kanechiii/matchwork/actions/workflows/quality.yml)
+[![React](https://img.shields.io/badge/React-19-149ECA)](https://react.dev/)
+[![Node](https://img.shields.io/badge/Node-24-339933)](https://nodejs.org/)
+[![ONNX](https://img.shields.io/badge/ONNX-Runtime-005CED)](https://onnxruntime.ai/)
 
-## Overview
+[**Open Azure Studio**](https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/#/studio) · [Landing page](https://kanechiii.github.io/matchwork/) · [Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md)
 
-Matchwork turns nine seeded 90-minute fictional football fixtures into synchronized replay, event-derived statistics, contextual intelligence and evidence-linked recaps. The experience separates accessible **Fan** explanations from more detailed **Analyst** interpretation. The app remains useful when either AI service is unavailable: rules-based insight continues and ONNX availability is disclosed.
+</div>
 
-## Try the Demo
+> **Synthetic demonstration:** All teams, players and events are fictional. No live Premier League data or footage is ingested. ONNX classifier scores are illustrative, not calibrated real-match probabilities.
 
-1. Open the [fully functional Azure Studio](https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/#/studio), or visit the [GitHub Pages landing](https://kanechiii.github.io/matchwork/) and select Studio (which opens Azure). Allow for a cold start after inactivity.
-2. Select any of nine fictional fixtures. Play, pause, restart or seek the match. Inspect synchronized score, event feed, player profiles and statistics.
-3. Explore Fan and Analyst explanations and inspect cited event identifiers.
-4. Pause or seek to automatically request an evidence-linked Microsoft Foundry narrative in **Match story** without signing in. Inspect the **Microsoft Foundry** source badge and cited synthetic event IDs; when inference is unavailable or its allowance is exhausted, Match story displays a clearly labeled deterministic fallback.
+## Navigate
 
-**Access boundary:** The Azure Studio provides a narrowly scoped anonymous `POST /api/public/agents/insights` endpoint with canonical server-side evidence, exact-origin checks, shared Redis quotas and per-fixture caching. Separate administrative `POST /api/insights`, `POST /api/agents/insights`, and browser operator routes remain protected. No Foundry API keys or Redis credentials are shipped to the browser. GitHub Pages is static: its Studio entry redirects to Azure rather than trying to call a cross-origin API or emulate live Foundry inference.
+[Experience](#experience) · [Architecture](#architecture) · [AI workflow](#ai-workflow) · [Quick start](#quick-start) · [Repository map](#repository-map) · [Verification](#verification) · [Deployment](#deployment) · [Safeguards](#safeguards) · [Contributing](#contributing)
+
+## Experience
+
+Nine seeded 90-minute fictional fixtures become synchronized replay, football statistics, evidence-linked intelligence and match stories.
+
+| Explore | What to try |
+| --- | --- |
+| Replay | Select a fixture; play, pause, restart or seek. Watch the score, event feed and statistics update. |
+| Fan / Analyst | Switch audience and team focus; compare explanations and evidence without resetting replay. |
+| Browser ML | Inspect the synthetic-trained ONNX classifier and its sampled timestamp. |
+| Match story | Pause or seek in Azure Studio to request a bounded Foundry narrative; inspect source and cited event IDs. |
+
+Open [Azure Studio](https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/#/studio) (allow for cold starts). No login is needed for the bounded public narrative route. Availability depends on cloud configuration and quotas; deterministic stories remain available when AI is unavailable.
 
 ## Architecture
 
-```text
-Seeded fictional match + replay event generator
-                   │
-                   ▼
-React + TypeScript + Vite dashboard
- ├─ Replay, scoring, match statistics, evidence feed
- ├─ ONNX Runtime Web (synthetic-trained WASM classifier)
- └─ Rule-based fallback and Fan / Analyst explanations
-                   │
-           Protected API boundary
-                   ▼
-FastAPI in Azure Container Apps (Japan East)
- ├─ Nine checksum-verified ledgers (one per seeded fixture)
- ├─ Public bounded narrative route plus protected administrative endpoints
- ├─ Microsoft Foundry model inference (opt-in specialist path)
- ├─ Atomic Redis shared attempt budget (enabled on secure demo)
- └─ Explicit AI-unavailable and budget-limited fallback
-
-GitHub Actions → GHCR image → Azure Container Apps
-                            ↕ private VNet / TLS
-                         Azure Managed Redis
+```mermaid
+flowchart TD
+    A["Seeded synthetic fixtures and events"] --> B["Replay clock and observed events"]
+    B --> C["Statistics and deterministic explanations"]
+    B --> D["ONNX Runtime Web / WASM"]
+    C --> E["React Studio"]
+    D --> E
+    E --> F["Fan / Analyst views"]
+    E -->|"Pause or seek: fixture ID, clock, audience"| G["FastAPI public narrative endpoint"]
+    H["Canonical checksum-verified ledgers"] --> G
+    G <-->|"Quota reservations and cache"| I["Azure Managed Redis"]
+    G --> J["Foundry specialist workflow"]
+    J -->|"Audited narrative or fallback"| E
 ```
 
-The backend verifies the selected fixture and replay clock against its own checksum-verified event ledger and selects observed event IDs itself for public requests. It does **not** accept caller-authored match descriptions, scores or fallback text. The public workflow runs model-backed Tactical Analyst and Narrative Agent specialists followed by an evidence-citation auditor; a live response is identifiable by `source: foundry` and `status: success`. This was verified in the Azure browser on original and additional fixtures.
+The five challenge stages are **ingest → interpret → explain → render → personalize**. The browser's replay engine remains deterministic; AI supplements rather than controls match truth. [Architecture details](docs/architecture.md).
 
-## Technology
+## AI workflow
 
-| Layer | Implementation |
-| --- | --- |
-| Frontend | React, TypeScript, Vite, CSS |
-| Replay and analysis | Deterministic seeded events, rolling context, event-derived statistics |
-| Browser ML | Microsoft ONNX Runtime Web / WASM with synthetic prototypes |
-| Backend | Python 3.12, FastAPI, trusted evidence validation |
-| Generative AI | Microsoft Foundry; Agent Framework-backed specialist workflow is opt-in |
-| Hosting | Azure Container Apps, GHCR, GitHub Actions |
-| Cost safeguards | Azure Managed Redis atomic shared AI-attempt ledger, per-process concurrency, quotas and budget alerts |
+```mermaid
+flowchart TD
+    A["Pause or seek"] --> B["Validate origin, fixture and time"]
+    B --> C["Select observed canonical evidence"]
+    C --> D{"Eligible cached narrative?"}
+    D -->|Yes| H["Return verified cached story"]
+    D -->|No| E{"AI enabled and budget available?"}
+    E -->|Yes| F["Foundry Tactical Analyst"]
+    F --> G["Foundry Narrative Agent"]
+    G --> I{"Local citation audit passes?"}
+    I -->|Yes| H
+    I -->|No| J["Deterministic fallback"]
+    E -->|No| J
+    F -->|Error| J
+    G -->|Error| J
+```
 
-## Local Development
+The public request contains only fixture ID, sampled clock and audience. The server validates against its own fixture ledger and selects the last five observed events; caller-authored match facts are not accepted. Cache entries are isolated by fixture, canonical digest, time and audience. Earlier eligible narratives retain their original as-of time. The citation audit checks provenance, not arbitrary prose truth. See [specialist workflow](docs/FOUNDRY_MULTI_AGENT.md).
 
-Requires Node.js 24, npm and Python 3.12+.
+<details>
+<summary><strong>What happens when AI is unavailable?</strong></summary>
+
+Browser ONNX CDN/WASM failure is disclosed without stopping replay, stats, feed or deterministic recaps. Foundry failures, disabled inference, rejected citations and exhausted budgets use a labeled rule-based fallback. Live Foundry is identified by `source: foundry` and `status: success`; a deterministic story is not evidence of a live model call.
+
+</details>
+
+## Quick start
+
+Prerequisites: Node.js 24, npm and Python 3.12+ for the backend.
 
 ```powershell
 git clone https://github.com/Kanechiii/matchwork.git
@@ -69,7 +92,10 @@ npm ci
 npm run dev
 ```
 
-For the backend, in another terminal:
+<details>
+<summary><strong>Run the optional local backend</strong></summary>
+
+In a separate terminal at the repository root:
 
 ```powershell
 python -m pip install -r backend/requirements.txt
@@ -77,12 +103,28 @@ node scripts/exportReplay.mjs
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-Browser replay and rule-based recaps work without paid AI credentials. The public AI preview is enabled only on the Azure server with trusted evidence, a deployed Foundry model, a Redis-backed shared attempt ledger and conservative request quotas. Keep `MATCHWORK_AI_ENABLED=false` for any environment without these safeguards. See [API security](docs/PHASE7B_API_SECURITY.md) and [Foundry workflow](docs/FOUNDRY_MULTI_AGENT.md). Do not commit credentials or `.env` files.
+Keep `MATCHWORK_AI_ENABLED=false` in environments without approved credentials, trusted evidence and budget controls. Browser replay and deterministic explanations do not require paid AI credentials. See [API security](docs/PHASE7B_API_SECURITY.md).
+
+</details>
+
+## Repository map
+
+| Path | Responsibility |
+| --- | --- |
+| [src/engine](src/engine/) · [src/data](src/data/) | Seeded simulation, fixtures, replay and statistics |
+| [src/ai](src/ai/) | Browser ONNX model, features and explanations |
+| [src/studio](src/studio/) · [src/landing](src/landing/) | Studio and landing experience |
+| [src/services](src/services/) · [src/orchestration](src/orchestration/) | Public API client and deterministic workflow prototype |
+| [backend](backend/) | FastAPI, canonical evidence, Foundry, quotas, audit |
+| [scripts](scripts/) · [backend/tests](backend/tests/) | Regression tests, model training, replay export |
+| [.github/workflows](.github/workflows/) | CI and authorized release workflows |
+| [docs](docs/README.md) | Architecture and preserved engineering records |
 
 ## Verification
 
 ```powershell
 npm ci
+python -m pip install -r backend/requirements.txt
 node scripts/exportReplay.mjs
 npm run build
 npm run lint
@@ -90,39 +132,65 @@ python -m unittest discover -s backend/tests -p 'test_*.py'
 python -m backend.evaluate_agents
 ```
 
-Additional reproducibility, replay, ONNX, enterprise and workflow checks run in [GitHub Actions](.github/workflows/quality.yml).
+<details>
+<summary><strong>Additional replay and intelligence checks</strong></summary>
 
-## GitHub Pages and Azure Studio
+```powershell
+node scripts/verifyGenerator.mjs
+node scripts/verifyStats.mjs
+node scripts/verifyLeague.mjs
+node scripts/verifyReplay.mjs
+node scripts/verifyIntegration.mjs
+node scripts/verifyIntelligence.mjs
+node scripts/verifyWorkflow.mjs
+```
 
-GitHub Pages publishes the static landing page at [kanechiii.github.io/matchwork](https://kanechiii.github.io/matchwork/). Studio navigation transfers visitors to the [Azure-hosted application](https://matchwork-secure-demo.bluemeadow-70e920b0.japaneast.azurecontainerapps.io/#/studio). This design keeps **live Foundry, ONNX, fixture selection and replay functional** without weakening the exact Azure Origin protection or exposing cloud credentials. Pages by itself does **not** host the AI backend.
+[Quality CI](.github/workflows/quality.yml) additionally exercises offline Agent Framework construction, actual ONNX WASM inference, reproducible training, Pages paths and enterprise checks. CI is not proof of live Foundry availability or browser QA.
 
-## Nine-fixture Foundry narratives
+</details>
 
-The Match story supports automatic, evidence-linked Microsoft Foundry narration for **all nine fictional league fixtures**. Pause or seek in any fixture; the browser submits its fixture ID, sampled match clock, and Fan/Analyst audience. The server selects the last five observed events from that fixture's own checksum-verified seeded replay; arbitrary client event descriptions and future events are never accepted. The Tactical Analyst and Narrative Agent use this bounded evidence, followed by a citation auditor.
+## Deployment
 
-Narratives are **opt-in at the server**, controlled by `MATCHWORK_PUBLIC_AI_ENABLED`, Redis-backed public and global quotas, and server-side model credentials. Successful generated narratives are cached per fixture + audience + observed clock and can be reused safely from earlier match moments. When the budget is exhausted or Foundry is unavailable, every fixture retains the deterministic story and browser-side ONNX classification. Automatic narration is requested after pauses/seeks, not on every live playback tick. All fixtures and evidence are synthetic.
+```mermaid
+flowchart LR
+    A["Reviewed PR"] --> B["Quality CI"]
+    B --> C["Maintainer-approved merge"]
+    C --> D["Manual Pages publish"]
+    C --> E["GHCR image publish"]
+    E --> F["Authorized Azure Container Apps rollout"]
+    D --> G["Static landing page"]
+    G -->|"Studio navigation"| F
+    F <-->|"Private VNet / TLS"| H["Azure Managed Redis"]
+    F --> I["Microsoft Foundry"]
+```
 
-## Security, Cost and Limitations
+GitHub Pages serves a static landing page and redirects Studio navigation to Azure. It does not host the backend. Releases require separate authorization; consult [deployment evidence](docs/DEPLOYMENT_CURRENT.md) and [release checklist](docs/RELEASE_CHECKLIST.md).
 
-- The canonical synthetic ledger and event IDs support auditing but do not establish factual correctness of generated narratives.
-- The ONNX classifier is trained on synthetic prototypes, not a real-world validated football dataset.
-- The API bearer token remains server-side; the optional operator cookie/session is not production identity management.
-- The secure Azure demo uses a private-endpoint Redis instance and an atomic hourly/daily reservation script for **shared AI attempt limits**. A reservation test succeeded; this is **not** a hard spending cap, user quota or durable audit trail.
-- Azure budgets notify; they do not automatically shut off billable inference. Redis loss or alternate Foundry clients may bypass attempts recorded by this application.
-- A rule-based recap should not be represented as proof of live Foundry inference. Model-backed specialist deployment requires its own verification.
-- No official football broadcast media or live Premier League feeds are bundled.
+## Safeguards
 
-See [deployment evidence](docs/DEPLOYMENT_CURRENT.md), [cost controls](PHASE7_COST_GUARD.md), and [documentation index](docs/README.md).
+- Anonymous `POST /api/public/agents/insights` is limited to trusted synthetic evidence, exact-origin checks, shared Redis quotas and cache. Origin checks are not authentication.
+- Administrative `/api/insights`, `/api/agents/insights` and browser operator routes retain protection; no server keys or Redis credentials belong in frontend code.
+- Redis attempt limits, concurrency and Azure budget alerts are safeguards, not a hard spending cap or durable audit trail. Redis loss or other Foundry clients can bypass recorded attempts.
+- Operator sessions are not production identity management. Synthetic models are not real-world validated; no official broadcast media is bundled.
 
-## Submission Readiness
+[Cost controls](PHASE7_COST_GUARD.md) · [Protected API](docs/PHASE7B_API_SECURITY.md) · [Evaluation and observability](docs/FOUNDRY_EVALUATION_OBSERVABILITY.md)
 
-- [x] Repository with documented synthetic-data limitations
-- [x] Publicly reachable secure Azure Container Apps demo and replay/recap smoke test
-- [x] Redis-backed shared attempt reservation tested in the secure environment
-- [x] Verify model-backed Foundry output separately from rules-based fallback on Azure for the original and additional fixtures
-- [ ] Check desktop/mobile presentation, screenshots and incognito access
-- [ ] Publish a demo video **under two minutes**
-- [ ] Confirm contributor permissions and license decision
-- [ ] Complete submission at [Inside the Game](https://aka.ms/insidethegame)
+## Contributing
 
-**Deadline:** October 27, 2026, 11:59 PM Pacific time (October 28, 2026, 2:59 PM Philippines). Detailed acceptance steps: [release checklist](docs/RELEASE_CHECKLIST.md).
+```mermaid
+flowchart LR
+    A["Inspect scope and existing issues"] --> B["Specify and plan"]
+    B --> C["Focused branch and conventional commits"]
+    C --> D["Risk-based verification"]
+    D --> E["Sentence-title PR and review"]
+    E --> F{"Approved?"}
+    F -->|No| C
+    F -->|Yes| G["Maintainer merges"]
+    G --> H["Post-merge verification"]
+```
+
+Read [repository-wide agent instructions](AGENTS.md) and [contribution standards](CONTRIBUTING.md). PR titles use a plain sentence; commits and squash subjects use Conventional Commits. Historical records are preserved.
+
+## Hackathon record
+
+The original submission deadline was October 27, 2026, 11:59 PM Pacific. See the [historical submission checklist](docs/RELEASE_CHECKLIST.md) and [documentation index](docs/README.md). No new claim of submission, judging result, published video or approved license is made here.
