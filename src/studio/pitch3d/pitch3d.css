@@ -1,0 +1,24 @@
+.pitch3d { min-width: 0; }
+.pitch3d-stage { position: relative; aspect-ratio: 1.55; background: #11251d; border-radius: var(--radius-l); overflow: hidden; }
+.pitch3d-canvas { position: absolute; inset: 0; }
+.pitch3d-canvas canvas { display: block; width: 100%; height: 100%; max-width: 100%; }
+.pitch3d-badge { position:absolute; top:8px; left:8px; background:#14251ee8; color:#e8fff1; padding:5px 8px; border-radius:5px; font-size:10px; font-weight:600; pointer-events:none; }
+.pitch3d-loading { position:absolute; inset:0; display:grid; place-content:center; color:#e8fff1; pointer-events:none; }
+.pitch3d-note { margin:8px 0; font-size:12px; color:var(--text-3); line-height:1.5; }
+.pitch3d-controls { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; font-size:12px; }
+.pitch3d-cameras { display:flex; gap:4px; }
+.pitch3d-cameras button[aria-pressed=true] { border-color:var(--accent); color:var(--accent-text); }
+.pitch3d-controls label { display:flex; gap:6px; align-items:center; }
+.pitch3d-controls input[type=range] { width:72px; }
+.pitch3d-select { flex-basis:100%; flex-wrap:wrap; }
+.pitch3d-select select { min-width:0; max-width:100%; flex:1; background:var(--surface); color:var(--text); border:1px solid var(--border-strong); border-radius:6px; padding:7px; }
+.pitch3d-details { border:1px solid var(--border); border-radius:var(--radius-m); margin-top:10px; padding:10px; font-size:12px; background:var(--surface); }
+.pitch3d-detail-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.pitch3d-details p { margin:5px 0; color:var(--text-2); }
+.pitch3d-details dl { margin:8px 0; display:grid; gap:5px; }
+.pitch3d-details dl div { display:grid; grid-template-columns:minmax(72px,1fr) minmax(0,2fr); gap:8px; }
+.pitch3d-details dt { color:var(--text-3); }
+.pitch3d-details dd { margin:0; overflow-wrap:anywhere; }
+.pitch3d-mode { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+.pitch3d-fallback { color:var(--text-2); font-size:12px; margin:8px 0; }
+@media(max-width:480px){.pitch3d-stage{aspect-ratio:1.3}.pitch3d-controls button{min-height:36px}.pitch3d-select select{min-height:40px}}
