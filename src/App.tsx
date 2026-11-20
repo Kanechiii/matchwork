@@ -39,6 +39,7 @@ import { buildRoster, describeEvent, formatClock } from "./studio/format";
 import { FixturePicker, FixtureStrip } from "./studio/Fixtures";
 import { TeamFollow } from "./studio/TeamFollow";
 import { ActionPitch } from "./studio/ActionPitch";
+import { MatchScene } from "./studio/pitch3d/MatchScene";
 import { CompareColumns, MomentumChart, TrendChart, type MomentumBucket, type TrendPoint } from "./studio/StatCharts";
 import { PlayerBoard } from "./studio/PlayerBoard";
 import { buildStatTimeline, PERIOD_SECONDS, STAT_METRICS, TIMELINE_STEP, ZERO_TEAM_STATS } from "./studio/statSeries";
@@ -64,6 +65,8 @@ function MatchStudio({ match, selectedFixture, onSelectFixture }: { match: typeo
   const [statView, setStatView] = useState<"compare" | "columns" | "trend" | "momentum">("compare");
   const [statMetric, setStatMetric] = useState("shots");
   const [pitchMode, setPitchMode] = useState<"recent" | "window">("recent");
+  const [pitchView, setPitchView] = useState<"3d" | "2d">("3d");
+  const [pitchFailed, setPitchFailed] = useState(false);
   const roster = useMemo(() => buildRoster(match), [match]);
   const statTimeline = useMemo(() => buildStatTimeline(match), [match]);
   
@@ -629,22 +632,26 @@ const [modelError, setModelError] = useState("");
           </motion.div>
 
           <motion.div className="studio-col studio-side" variants={enter}>
-            <section className="card" aria-label="Observed event location on pitch">
+            <section className="card" aria-label="Match pitch visualization">
               <div className="card-head">
-                <div><span className="eyebrow">From the pitch</span><h2>{isAnalyst ? "Observed event position" : "Where the action is"}</h2></div>
+                <div><span className="eyebrow">From the pitch</span><h2>{pitchView === "3d" ? "Simulated match replay" : isAnalyst ? "Observed event position" : "Where the action is"}</h2></div>
                 <div className="legend"><span><i className="legend-dot is-home" />{homeTeam.abbreviation}</span><span><i className="legend-dot is-away" />{awayTeam.abbreviation}</span></div>
               </div>
-              <div className="pitch-toolbar">
+              <div className="pitch3d-mode">
+                <Segmented id="pitch-view" label="Pitch visualization" size="sm" value={pitchView} onChange={(value) => { setPitchView(value); if (value === "3d") setPitchFailed(false); }} options={[{value:"3d",label:"3D replay"},{value:"2d",label:"2D evidence"}]} />
+              </div>
+              {pitchFailed && <p className="pitch3d-fallback" role="status">3D rendering is unavailable. The 2D evidence view remains available.</p>}
+              {pitchView === "2d" && <div className="pitch-toolbar">
                 <Segmented id="studio-pitch" label="Events shown on the pitch" size="sm" value={pitchMode} onChange={setPitchMode} options={[
                   { value: "recent", label: "Latest 5" },
                   { value: "window", label: "Last 3 min" },
                 ]} />
                 <span className="count tabular">{pitchEvents.length} {pitchEvents.length === 1 ? "event" : "events"}</span>
-              </div>
+              </div>}
               <div className="pitch-frame">
-                <ActionPitch events={pitchEvents} match={match} roster={roster} isAnalyst={isAnalyst} path={pitchMode === "recent"} fade={pitchMode === "window"}
+                {pitchView === "3d" ? <MatchScene match={match} roster={roster} replay={replay} isAnalyst={isAnalyst} onOpenPlayer={setSelectedPlayer} onFailure={() => { setPitchFailed(true); setPitchView("2d"); }} /> : <ActionPitch events={pitchEvents} match={match} roster={roster} isAnalyst={isAnalyst} path={pitchMode === "recent"} fade={pitchMode === "window"}
                   onOpenPlayer={(playerId) => setSelectedPlayer(playerId)}
-                  label={latestMoment ? `Latest observed event location, ${Math.round(latestMoment.x)} percent along and ${Math.round(latestMoment.y)} percent across the pitch. Hover or focus a dot for player and team details.` : "Pitch visualization awaiting the first event"} />
+                  label={latestMoment ? `Latest observed event location, ${Math.round(latestMoment.x)} percent along and ${Math.round(latestMoment.y)} percent across the pitch. Hover or focus a dot for player and team details.` : "Pitch visualization awaiting the first event"} />}
               </div>
               <p className="card-foot tabular">{latestMoment ? `${formatClock(latestMoment.elapsedSeconds)} · ${describeEvent(latestMoment)}${momentActor ? ` · ${momentActor.player.name}` : ""}` : "Start the replay to see where recorded match events occur."}</p>
             </section>
