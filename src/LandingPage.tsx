@@ -1,7 +1,7 @@
 import { ScrollHeading, WipeReveal } from "./landing/ScrollMotion";
 import { useEffect, useState } from "react";
 import { motion, useScroll, useSpring } from "motion/react";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowRight, Menu, ShieldCheck, X } from "lucide-react";
 import type { SyntheticMatch } from "./types/match";
 import { Brand } from "./components/Brand";
 import { ThemeToggle } from "./components/ThemeToggle";
@@ -56,8 +56,16 @@ function LandingPage({ match }: LandingPageProps) {
   const sample = useSampleMoment(match);
   const model = useSampleModel(sample.features);
   const active = useActiveSection(NAV_IDS);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { scrollYProgress } = useScroll();
   const progress = useSpring(scrollYProgress, { stiffness: 200, damping: 40, restDelta: 0.001 });
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileNavOpen(false); };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [mobileNavOpen]);
 
   return (
     <div className="lp">
@@ -76,8 +84,19 @@ function LandingPage({ match }: LandingPageProps) {
           <div className="lp-header-end">
             <ThemeToggle />
             <a className="btn btn-primary lp-header-cta" href="#/studio">Open the studio</a>
+            <button type="button" className="icon-btn lp-menu-toggle" aria-label={mobileNavOpen ? "Close landing page navigation" : "Open landing page navigation"} aria-expanded={mobileNavOpen} aria-controls="lp-mobile-nav" onClick={() => setMobileNavOpen((open) => !open)}>
+              {mobileNavOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+            </button>
           </div>
         </div>
+        <nav id="lp-mobile-nav" className={`lp-mobile-nav${mobileNavOpen ? " is-open" : ""}`} aria-label="Landing page mobile navigation" aria-hidden={!mobileNavOpen}>
+          {NAV.map((item) => (
+            <a key={item.id} href={`#${item.id}`} aria-current={active === item.id ? "true" : undefined} tabIndex={mobileNavOpen ? 0 : -1} onClick={() => setMobileNavOpen(false)}>
+              <span>{item.label}</span>
+              <ArrowRight aria-hidden="true" />
+            </a>
+          ))}
+        </nav>
         <motion.div className="lp-progress" style={{ scaleX: progress }} aria-hidden="true" />
       </header>
 

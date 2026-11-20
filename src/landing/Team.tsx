@@ -4,9 +4,9 @@ import { ArrowUpRight } from "lucide-react";
 
 // Sourced from the repository's GitHub collaborators and commit authors.
 const MEMBERS = [
-  { handle: "Kanechiii", name: "Kenneth Gabriel Alido", role: "Project lead · Repository owner" },
-  { handle: "gyryan", name: "Mark Ryan Songalia", role: "Collaborator" },
-  { handle: "Mark-Gerald", name: "Mark Gerald", role: "Collaborator" },
+  { handle: "Kanechiii", name: "Kenneth Gabriel Alido", role: "Project lead · Repository owner", initials: "KA" },
+  { handle: "gyryan", name: "Mark Ryan Songalia", role: "Collaborator", initials: "MS" },
+  { handle: "Mark-Gerald", name: "Mark Gerald", role: "Collaborator", initials: "MG" },
 ];
 
 const HEADLINE = "Three people. One match, read properly.".split(" ");
@@ -36,7 +36,7 @@ function Member({ m, i, progress }: { m: (typeof MEMBERS)[number]; i: number; pr
   return (
     <motion.li className="lp-team-card" style={{ y }}>
       <motion.div className="lp-team-photo" style={{ clipPath }}>
-        <motion.img src={`https://github.com/${m.handle}.png?size=480`} alt={`${m.name} on GitHub`} loading="lazy" style={{ scale }} />
+        <motion.div className="lp-team-avatar" style={{ scale }} role="img" aria-label={`${m.name}, ${m.role}`}>{m.initials}</motion.div>
         <span className="lp-team-index">0{i + 1}</span>
       </motion.div>
       <motion.div className="lp-team-meta" style={{ opacity }}>

@@ -25,7 +25,7 @@ export function NarrativeInterlude() {
           <span /><span /><span />
         </motion.div>
         <div className="lp-cinema-meta">
-          <span>THE MATCHWORK METHOD / 01—03</span>
+          <span>THE MATCHWORK METHOD / 01-03</span>
           <span>SCROLL TO FOLLOW THE EVIDENCE <ArrowDownRight aria-hidden="true" /></span>
         </div>
         <div className="lp-cinema-words">
