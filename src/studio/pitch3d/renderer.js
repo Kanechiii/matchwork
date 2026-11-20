@@ -7,7 +7,7 @@ const material = color => new THREE.MeshStandardMaterial({ color, roughness: 0.8
 export function createRenderer(host, roster, onHover, onSelect, onFailure) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "low-power" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-  renderer.setClearColor(0x11251d);
+  renderer.setClearColor(0x09120f);
   const canvas = renderer.domElement;
   canvas.setAttribute("aria-hidden", "true");
   host.appendChild(canvas);
@@ -30,6 +30,38 @@ export function createRenderer(host, roster, onHover, onSelect, onFailure) {
   sun.position.set(-20, 70, 35); scene.add(sun);
   const grass = [mat(0x31754b), mat(0x388054)];
   for (let i=0;i<10;i++) mesh(scene, box, grass[i%2], -47.25+i*10.5,-0.21,0,10.5,0.35,68);
+  // Original procedural stadium: dark stands and instanced spectator silhouettes.
+  // Decorative only, not match data or footage.
+  const concourse=mat(0x182820), terrace=mat(0x26342f);
+  mesh(scene,box,concourse,0,-0.48,0,142,0.45,103);
+  const crowdGeo=new THREE.BoxGeometry(0.65,0.9,0.55);
+  ownedGeometries.add(crowdGeo);
+  const crowdMat=mat(0xffffff);
+  const seats=[];
+  for(let row=0;row<7;row++){
+    const y=0.35+row*0.62;
+    const z=-39-row*1.65;
+    mesh(scene,box,terrace,0,y-0.42,z,133,0.75,1.7);
+    for(let i=0;i<100;i++)seats.push([i*1.28-63.36,y+0.45,z,row,i]);
+    for(const side of [-1,1]){
+      const x=side*(57+row*1.55);
+      mesh(scene,box,terrace,x,y-0.42,0,1.6,0.75,77);
+      for(let i=0;i<57;i++)seats.push([x,y+0.45,i*1.3-36.4,row,i+side*7]);
+    }
+  }
+  const crowd=new THREE.InstancedMesh(crowdGeo,crowdMat,seats.length);
+  const dummy=new THREE.Object3D(), tint=new THREE.Color();
+  const crowdColors=[0x263a3e,0x45534c,0x5b6056,0x303c4c,0x4d4140,0x374b43];
+  seats.forEach(([x,y,z,row,i],n)=>{
+    const hash=Math.abs(i*31+row*17);
+    dummy.position.set(x,y+(hash%5)*0.055,z);
+    dummy.scale.set(0.82+(hash%3)*0.08,0.85+(hash%4)*0.09,1);
+    dummy.updateMatrix();crowd.setMatrixAt(n,dummy.matrix);
+    crowd.setColorAt(n,tint.setHex(crowdColors[hash%crowdColors.length]));
+  });
+  crowd.instanceMatrix.needsUpdate=true;
+  if(crowd.instanceColor)crowd.instanceColor.needsUpdate=true;
+  scene.add(crowd);
   const paint = mat(0xe8f4de);
   const stripe = (x,z,w,d) => mesh(scene,box,paint,x,0.015,z,w,0.035,d);
   stripe(0,-34,105,0.20); stripe(0,34,105,0.20);
@@ -150,6 +182,6 @@ export function createRenderer(host, roster, onHover, onSelect, onFailure) {
     render,
     setView(next,nextZoom){view=next;zoom=nextZoom;aim();if(lastFrame)render(lastFrame,lastActive);else draw();},
     project(id){const m=models.get(id);if(!m)return null;const v=new THREE.Vector3(0,4.4,0);m.root.localToWorld(v);v.project(camera);return {x:(v.x+1)*50,y:(1-v.y)*50};},
-    dispose(){if(destroyed)return;destroyed=true;observer.disconnect();canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerleave",leave);canvas.removeEventListener("click",click);canvas.removeEventListener("webglcontextlost",lost);for(const g of ownedGeometries)g.dispose();for(const m of ownedMaterials)m.dispose();for(const t of textures)t.dispose();renderer.dispose();canvas.remove();}
+    dispose(){if(destroyed)return;destroyed=true;observer.disconnect();canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerleave",leave);canvas.removeEventListener("click",click);canvas.removeEventListener("webglcontextlost",lost);for(const g of ownedGeometries)g.dispose();for(const m of ownedMaterials)m.dispose();for(const t of textures)t.dispose();crowd.dispose();renderer.dispose();canvas.remove();}
   };
 }

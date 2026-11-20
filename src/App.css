@@ -251,3 +251,12 @@
 .phase8-notice { font-size: 12px; line-height: 1.6; color: var(--text-3); margin: 13px 0 0; }
 .phase8-description { font-size: 13px; color: var(--text-2); margin: -3px 0 14px; }
 @media (max-width: 760px) { .phase8-players { padding: 18px; } }
+
+/* Broadcast pitch: full studio width below the scoreboard. */
+.broadcast-pitch { margin-top: 16px; min-width: 0; }
+.broadcast-pitch .card-head { align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.broadcast-pitch .pitch-frame { min-width: 0; }
+.broadcast-pitch .action-pitch { max-width: 960px; margin-inline: auto; }
+.broadcast-provenance { margin: 4px 0 0; font-size: 12px; color: var(--text-2); }
+.broadcast-pitch .card-foot { margin-bottom: 0; }
+@media (max-width: 760px) { .broadcast-pitch { padding: 12px; } .broadcast-pitch .card-head { gap: 8px; } }

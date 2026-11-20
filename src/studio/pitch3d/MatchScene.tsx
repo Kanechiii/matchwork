@@ -22,6 +22,7 @@ export function MatchScene({match,roster,replay,isAnalyst,onOpenPlayer,onFailure
   const time=replay.elapsedSeconds+replay.carryMilliseconds/1000;
   const frame=useMemo(()=>createPitchFrame(match,time),[match,time]);
   const selected=pinned??hover;
+  const playerIds=useMemo(()=>[...roster.keys()],[roster]);
   const who=selected?roster.get(selected):undefined;
   const event=frame.players.find(p=>p.id===selected)?.event;
   useEffect(()=>{failure.current=onFailure;},[onFailure]);
@@ -62,26 +63,23 @@ export function MatchScene({match,roster,replay,isAnalyst,onOpenPlayer,onFailure
     return ()=>cancelAnimationFrame(request);
   },[ready,time,replay.status,frame,match,selected]);
   return <div className="pitch3d">
-    <div className="pitch3d-stage">
+    <div className="pitch3d-stage" role="group" tabIndex={0} aria-label="Match pitch. Hover or tap a player, or use left and right arrows to inspect players. Escape closes details."
+      onKeyDown={e=>{
+        if(e.target!==e.currentTarget)return;
+        if(e.key==="Escape"){e.stopPropagation();setPinned(null);setHover(null);return;}
+        if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight")return;
+        e.preventDefault();e.stopPropagation();
+        if(!playerIds.length)return;
+        const step=e.key==="ArrowRight"?1:-1;
+        const index=selected?playerIds.indexOf(selected):-1;
+        setHover(null);
+        setPinned(playerIds[index<0?(step===1?0:playerIds.length-1):(index+step+playerIds.length)%playerIds.length]);
+      }}>
       <div ref={host} className="pitch3d-canvas" aria-hidden="true"/>
       {!ready&&<div className="pitch3d-loading" role="status">Loading 3D replay…</div>}
-      <span className="pitch3d-badge">Simulated 3D replay</span>
-    </div>
-    <p className="pitch3d-note">Illustrative movement between observed events — not continuous player tracking. Hover a player for details or click to pin.</p>
-    <div className="pitch3d-controls">
-      <div className="pitch3d-cameras" role="group" aria-label="Camera angle">
-        <button type="button" className="btn btn-secondary btn-sm" aria-pressed={view==="broadcast"} onClick={()=>setView("broadcast")}>Broadcast</button>
-        <button type="button" className="btn btn-secondary btn-sm" aria-pressed={view==="overhead"} onClick={()=>setView("overhead")}>Overhead</button>
-      </div>
-      <label>Zoom <input type="range" min="1" max="1.6" step="0.1" value={zoom} onChange={e=>setZoom(Number(e.target.value))}/></label>
-      <label className="pitch3d-select">Inspect player <select value={pinned??""} onChange={e=>setPinned(e.target.value||null)}>
-        <option value="">Select a player</option>
-        {[...roster.values()].map(({player,team})=><option key={player.id} value={player.id}>{team.abbreviation} · #{player.shirtNumber} {player.name}</option>)}
-      </select></label>
-    </div>
-    {who&&<div className="pitch3d-details" aria-label="Selected player details">
+    {who&&<div className={`pitch3d-details${pinned===selected ? " is-pinned" : ""}`} role={pinned===selected ? "group" : "tooltip"} aria-label="Player details">
       <div className="pitch3d-detail-head"><strong>#{who.player.shirtNumber} {who.player.name}</strong>
-      {pinned&&<button type="button" className="btn btn-secondary btn-sm" onClick={()=>setPinned(null)}>Close</button>}</div>
+      {pinned===selected&&<button type="button" className="btn btn-secondary btn-sm" onClick={()=>{setPinned(null);setHover(null);}}>Close</button>}</div>
       <p>{who.team.name} · {POSITION_NAMES[who.player.position]}</p>
       {event?<dl>
         <div><dt>Last observed action</dt><dd>{describeEvent(event)} · {formatClock(event.elapsedSeconds)}</dd></div>
@@ -89,7 +87,17 @@ export function MatchScene({match,roster,replay,isAnalyst,onOpenPlayer,onFailure
         <div><dt>Zone</dt><dd>{describeZone(event,match.metadata.homeTeam.id)}</dd></div>
         {isAnalyst&&<div><dt>Evidence</dt><dd><code>{event.id}</code> · x {Math.round(event.x)} · y {Math.round(event.y)}</dd></div>}
       </dl>:<p>No observed action for this player yet.</p>}
-      {pinned&&<button type="button" className="btn btn-primary btn-sm" onClick={()=>onOpenPlayer(who.player.id)}>View player profile</button>}
+      {pinned===selected&&<button type="button" className="btn btn-primary btn-sm" onClick={()=>onOpenPlayer(who.player.id)}>View player profile</button>}
     </div>}
+    </div>
+    <p className="pitch3d-note">Illustrative movement between recorded events, not continuous tracking.</p>
+    <div className="pitch3d-controls">
+      <div className="pitch3d-cameras" role="group" aria-label="Camera angle">
+        <button type="button" className="btn btn-secondary btn-sm" aria-pressed={view==="broadcast"} onClick={()=>setView("broadcast")}>Broadcast</button>
+        <button type="button" className="btn btn-secondary btn-sm" aria-pressed={view==="overhead"} onClick={()=>setView("overhead")}>Overhead</button>
+      </div>
+      <label>Zoom <input type="range" min="1" max="1.6" step="0.1" value={zoom} onChange={e=>setZoom(Number(e.target.value))}/></label>
+    </div>
+
   </div>;
 }

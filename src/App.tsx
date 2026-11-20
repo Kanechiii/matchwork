@@ -1,7 +1,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Activity, BookOpen, ChartColumn, ChartColumnBig, ChartSpline, ChevronDown, CircleAlert, Info, ListChecks, Pause, Play, RefreshCw, RotateCcw, SlidersHorizontal, Users, X } from "lucide-react";
+import { Activity, BookOpen, ChartColumn, ChartColumnBig, ChartSpline, ChevronDown, CircleAlert, ListChecks, Pause, Play, RefreshCw, RotateCcw, SlidersHorizontal, Users, X } from "lucide-react";
 import type { MatchEvent } from "./types/match";
 import { demoMatch } from "./data/demoMatch";
 import { generateSyntheticMatch } from "./engine/generateEvents";
@@ -223,7 +223,6 @@ const [modelError, setModelError] = useState("");
   const whyText = isAnalyst
     ? insight.whyItMatters
     : modelDisplayStatus === "ready" ? insight.whyItMatters : "Every update comes from events already shown in the replay.";
-  const sourceLabel = visibleAiInsight?.source === "foundry" ? "Microsoft Foundry" : "Rule based";
   const shotMarks = match.events.filter(
     (event): event is Extract<MatchEvent, { type: "shot" }> => event.type === "shot" && event.elapsedSeconds <= replay.elapsedSeconds,
   );
@@ -253,7 +252,7 @@ const [modelError, setModelError] = useState("");
   const storyNote = visibleAiInsight?.source === "foundry"
     ? `Microsoft Foundry · verified events through ${formatClock(visibleAiInsight.as_of_seconds ?? sampleTime)} · interpretation, not established intent`
     : aiLoading ? `Generating evidence-linked narration through ${formatClock(sampleTime)}; showing observed events meanwhile`
-    : isPlaying ? "Live event story · pause or seek for automatic Foundry narration"
+    : isPlaying ? "Event story · pause or seek for Foundry narration"
     : visibleAiInsight?.source === "rule-based"
       ? visibleAiInsight.status === "public_ai_hourly_limited"
         ? "Public AI hourly allowance reached · event-based fallback; cached narratives remain available"
@@ -359,9 +358,6 @@ const [modelError, setModelError] = useState("");
             <button type="button" onClick={() => scrollTo("numbers")}>Statistics</button>
           </nav>
           <div className="studio-bar-end">
-            <span className="studio-data-note" title="All teams, players and events are fictional. No live Premier League data or personal information.">
-              <Info aria-hidden="true" /> Synthetic data only
-            </span>
             <ThemeToggle />
           </div>
         </div>
@@ -394,7 +390,7 @@ const [modelError, setModelError] = useState("");
           </div>
           <FixturePicker fixtures={leagueFixtures} value={selectedFixture} onChange={onSelectFixture} featuredId={demoMatch.id} />
           <FixtureStrip fixtures={leagueFixtures} teams={leagueTeams} value={selectedFixture} onChange={onSelectFixture} />
-          <p className="phase8-notice">All nine synthetic fixtures support evidence-linked Microsoft Foundry narration when paused or seeking, subject to the shared judging-period AI budget.</p>
+
         </motion.section>
 
         <motion.section className="card scoreboard" aria-label="Match scoreboard and replay" variants={enter}>
@@ -403,6 +399,7 @@ const [modelError, setModelError] = useState("");
             <span className={`status-chip is-${replay.status}`}><span className="status-dot" aria-hidden="true" />{statusLabel}</span>
           </div>
 
+          <p className="broadcast-provenance">Fictional match · synthetic events</p>
           <div className="scoreline">
             <div className="team team-home">
               <TeamCrest team={homeTeam} size="lg" className="scoreline-crest" />
@@ -490,6 +487,30 @@ const [modelError, setModelError] = useState("");
           </div>
         </motion.section>
 
+        <motion.section className="card broadcast-pitch" aria-label="Match pitch visualization" variants={enter}>
+              <div className="card-head">
+                <div><h2>Match pitch</h2></div>
+                <div className="legend"><span><i className="legend-dot is-home" />{homeTeam.abbreviation}</span><span><i className="legend-dot is-away" />{awayTeam.abbreviation}</span></div>
+              </div>
+              <div className="pitch3d-mode">
+                <Segmented id="pitch-view" label="Pitch visualization" size="sm" value={pitchView} onChange={(value) => { setPitchView(value); if (value === "3d") setPitchFailed(false); }} options={[{value:"3d",label:"3D"},{value:"2d",label:"2D"}]} />
+              </div>
+              {pitchFailed && <p className="pitch3d-fallback" role="status">3D rendering is unavailable. The 2D evidence view remains available.</p>}
+              {pitchView === "2d" && <div className="pitch-toolbar">
+                <Segmented id="studio-pitch" label="Events shown on the pitch" size="sm" value={pitchMode} onChange={setPitchMode} options={[
+                  { value: "recent", label: "Latest 5" },
+                  { value: "window", label: "Last 3 min" },
+                ]} />
+                <span className="count tabular">{pitchEvents.length} {pitchEvents.length === 1 ? "event" : "events"}</span>
+              </div>}
+              <div className="pitch-frame">
+                {pitchView === "3d" ? <MatchScene match={match} roster={roster} replay={replay} isAnalyst={isAnalyst} onOpenPlayer={setSelectedPlayer} onFailure={() => { setPitchFailed(true); setPitchView("2d"); }} /> : <ActionPitch events={pitchEvents} match={match} roster={roster} isAnalyst={isAnalyst} path={pitchMode === "recent"} fade={pitchMode === "window"}
+                  onOpenPlayer={(playerId) => setSelectedPlayer(playerId)}
+                  label={latestMoment ? `Latest observed event location, ${Math.round(latestMoment.x)} percent along and ${Math.round(latestMoment.y)} percent across the pitch. Hover or focus a dot for player and team details.` : "Pitch visualization awaiting the first event"} />}
+              </div>
+              <p className="card-foot tabular">{latestMoment ? `${formatClock(latestMoment.elapsedSeconds)} · ${describeEvent(latestMoment)}${momentActor ? ` · ${momentActor.player.name}` : ""}` : "Start the replay to see where recorded match events occur."}</p>
+            </motion.section>
+
         <div className="studio-grid" id="insights">
           <motion.div className="studio-col" variants={enter}>
             <section className="card insight" aria-label="Match intelligence">
@@ -532,7 +553,7 @@ const [modelError, setModelError] = useState("");
 
               <Collapse show={isAnalyst}>
                 <div className="classifier">
-                  <div className="classifier-head"><span className="label">Classifier output</span><small>Not calibrated probabilities</small></div>
+                  <div className="classifier-head"><span className="label">Synthetic-model scores</span><small>Not calibrated probabilities</small></div>
                   {visibleModel && prediction ? (["CONTROL", "PRESSURE", "TRANSITION"] as const).map((label, index) => {
                     const value = prediction.probabilities[index];
                     return (
@@ -569,14 +590,12 @@ const [modelError, setModelError] = useState("");
                   <span className="eyebrow">{isAnalyst ? "Narrative" : "Story time"} · <span className="tabular">{formatClock(replay.elapsedSeconds)}</span></span>
                   <h2>{isAnalyst ? "Explanation and recap" : "Match story and quick recap"}</h2>
                 </div>
-                <span className={`status-chip is-${replay.status}`}><span className="status-dot" aria-hidden="true" />{isPlaying ? "Live" : statusLabel}</span>
               </div>
               <div className="story-panels">
                 <article className="story-panel is-story" aria-label={isAnalyst ? "Generated explanation" : "Match story"}>
                   <div className="story-panel-head">
                     <span className="story-icon" aria-hidden="true"><BookOpen /></span>
                     <span className="story-title">{isAnalyst ? "Generated explanation" : "Match story"}</span>
-                    <span className={`source-tag is-${visibleAiInsight?.source ?? "rule-based"}`}>{sourceLabel}</span>
                   </div>
                   <AnimatePresence mode="wait" initial={false}>
                     <motion.div key={isAnalyst ? "analyst" : "fan"} className="story-panel-copy" {...swap}>
@@ -605,7 +624,7 @@ const [modelError, setModelError] = useState("");
                     ))}
                   </dl>
                   <p>{recap}</p>
-                  <small className="story-note">Rule-generated from observed synthetic events · {homeTeam.abbreviation} vs {awayTeam.abbreviation}</small>
+                  <small className="story-note">Based on observed events · {homeTeam.abbreviation} vs {awayTeam.abbreviation}</small>
                 </article>
               </div>
             </section>
@@ -632,30 +651,6 @@ const [modelError, setModelError] = useState("");
           </motion.div>
 
           <motion.div className="studio-col studio-side" variants={enter}>
-            <section className="card" aria-label="Match pitch visualization">
-              <div className="card-head">
-                <div><span className="eyebrow">From the pitch</span><h2>{pitchView === "3d" ? "Simulated match replay" : isAnalyst ? "Observed event position" : "Where the action is"}</h2></div>
-                <div className="legend"><span><i className="legend-dot is-home" />{homeTeam.abbreviation}</span><span><i className="legend-dot is-away" />{awayTeam.abbreviation}</span></div>
-              </div>
-              <div className="pitch3d-mode">
-                <Segmented id="pitch-view" label="Pitch visualization" size="sm" value={pitchView} onChange={(value) => { setPitchView(value); if (value === "3d") setPitchFailed(false); }} options={[{value:"3d",label:"3D replay"},{value:"2d",label:"2D evidence"}]} />
-              </div>
-              {pitchFailed && <p className="pitch3d-fallback" role="status">3D rendering is unavailable. The 2D evidence view remains available.</p>}
-              {pitchView === "2d" && <div className="pitch-toolbar">
-                <Segmented id="studio-pitch" label="Events shown on the pitch" size="sm" value={pitchMode} onChange={setPitchMode} options={[
-                  { value: "recent", label: "Latest 5" },
-                  { value: "window", label: "Last 3 min" },
-                ]} />
-                <span className="count tabular">{pitchEvents.length} {pitchEvents.length === 1 ? "event" : "events"}</span>
-              </div>}
-              <div className="pitch-frame">
-                {pitchView === "3d" ? <MatchScene match={match} roster={roster} replay={replay} isAnalyst={isAnalyst} onOpenPlayer={setSelectedPlayer} onFailure={() => { setPitchFailed(true); setPitchView("2d"); }} /> : <ActionPitch events={pitchEvents} match={match} roster={roster} isAnalyst={isAnalyst} path={pitchMode === "recent"} fade={pitchMode === "window"}
-                  onOpenPlayer={(playerId) => setSelectedPlayer(playerId)}
-                  label={latestMoment ? `Latest observed event location, ${Math.round(latestMoment.x)} percent along and ${Math.round(latestMoment.y)} percent across the pitch. Hover or focus a dot for player and team details.` : "Pitch visualization awaiting the first event"} />}
-              </div>
-              <p className="card-foot tabular">{latestMoment ? `${formatClock(latestMoment.elapsedSeconds)} · ${describeEvent(latestMoment)}${momentActor ? ` · ${momentActor.player.name}` : ""}` : "Start the replay to see where recorded match events occur."}</p>
-            </section>
-
             <section className="card feed-card" aria-label="Recent match events">
               <div className="card-head">
                 <div><span className="eyebrow">Play by play</span><h2>{isAnalyst ? "Observed event stream" : "Latest action"}</h2></div>
@@ -689,7 +684,7 @@ const [modelError, setModelError] = useState("");
 
         <motion.section className="card stats" id="numbers" aria-label="Match statistics" variants={enter}>
           <div className="card-head">
-            <div><span className="eyebrow">Match stats</span><h2>{isAnalyst ? "Live match statistics" : "Match at a glance"}</h2></div>
+            <div><span className="eyebrow">Match stats</span><h2>{isAnalyst ? "Match statistics" : "Match at a glance"}</h2></div>
             <div className="stats-head-end">
               <Segmented id="studio-statview" label="Statistics visualization" size="sm" className="statview" value={statView} onChange={setStatView} options={[
                 { value: "compare", label: <span className="sv-text">Compare</span>, icon: <SlidersHorizontal aria-hidden="true" /> },
@@ -761,7 +756,7 @@ const [modelError, setModelError] = useState("");
 
         <motion.section className="card phase8-players" id="players" variants={enter} aria-label="Synthetic player performance">
           <div className="card-head">
-            <div><span className="eyebrow">Players · Event-derived</span><h2>Player performance</h2></div>
+            <div><h2>Player performance</h2></div>
             <Segmented id="studio-players" label="Statistics period" size="sm" value={playerView} onChange={setPlayerView} options={[
               { value: "replay", label: "Replay so far" },
               { value: "season", label: "All fixtures" },
@@ -770,12 +765,11 @@ const [modelError, setModelError] = useState("");
           <p className="phase8-description">Every number below comes from recorded synthetic events. Rest on a card for a quick look, or select it for the full profile and evidence.</p>
           <PlayerBoard players={sourcePlayers} teams={boardTeams} view={playerView} teamFilter={playerTeam} onTeamFilterChange={setPlayerTeam}
             selectedId={selectedPlayer} onSelect={setSelectedPlayer} isAnalyst={isAnalyst} match={match} elapsedSeconds={replay.elapsedSeconds} onSeek={onSeek} />
-          <p className="phase8-notice">All players, fixtures and statistics are fictional. These figures are not real-world performance measurements.</p>
         </motion.section>
 
         <footer className="studio-footer">
           <span>Matchwork. The game, understood.</span>
-          <span>Synthetic data use only. Fictional teams, players and events; no real match data or personal information. Model scores are illustrative.</span>
+          <span>Fictional teams, players and events. Model scores are illustrative.</span>
         </footer>
       </motion.main>
     </div>
